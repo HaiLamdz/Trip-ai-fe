@@ -2,10 +2,6 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "env": {
-    "NEXT_PUBLIC_API_URL": "@next_public_api_url",
-    "NEXT_PUBLIC_MAP_TILE_URL": "@next_public_map_tile_url"
-  },
   "crons": [
     {
       "path": "/api/cron/trigger",
