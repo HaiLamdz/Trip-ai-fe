@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base typography ──────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    font-size: 15px; /* bump up from browser default 16px feels small at 14px tailwind default */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  /* Headings — tighter tracking, heavier weight */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Better input defaults */
+  input, textarea, select, button {
+    font-family: inherit;
+    font-size: inherit;
+  }
+}
+
+/* ── Component classes ────────────────────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+  }
+  .btn-secondary {
+    @apply bg-teal-500 hover:bg-teal-600 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+  }
+  .btn-outline {
+    @apply border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+  }
+  .input {
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── CSS variables ────────────────────────────────────────────────────────── */
+:root {
+  --primary: #2563EB;
+  --secondary: #14B8A6;
+}
+
+/* ── Leaflet popup z-index fix ────────────────────────────────────────────── */
+/* Prevent Leaflet popups from escaping the map container into the left panel */
+.leaflet-container {
+  isolation: isolate;
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: 14px;
+}
+.leaflet-pane,
+.leaflet-popup {
+  z-index: auto;
+}
+.leaflet-map-pane    { z-index: 2; }
+.leaflet-tile-pane   { z-index: 2; }
+.leaflet-overlay-pane{ z-index: 4; }
+.leaflet-shadow-pane { z-index: 5; }
+.leaflet-marker-pane { z-index: 6; }
+.leaflet-tooltip-pane{ z-index: 6; }
+.leaflet-popup-pane  { z-index: 7; }
+.leaflet-control     { z-index: 8; }
+
+/* ── Inline spinner for ActivityCard image loading ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
