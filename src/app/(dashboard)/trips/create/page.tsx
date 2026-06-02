@@ -13,6 +13,7 @@ const TRANSPORT_MODES = [
   { value: 'bus',       label: '🚌 Xe buýt' },
   { value: 'plane',     label: '✈️ Máy bay' },
   { value: 'train',     label: '🚂 Tàu hỏa' },
+  { value: 'mixed',     label: '🔀 Kết hợp' },
 ];
 
 const ACCOMMODATION_TYPES = [
@@ -24,13 +25,14 @@ const ACCOMMODATION_TYPES = [
   { value: 'villa',    label: '🏰 Villa',      desc: 'Biệt thự riêng' },
 ];
 
-const TRENDING = ['Hà Nội', 'Paris', 'Đà Nẵng', 'Tokyo', 'Phú Quốc'];
-
-const BUDGET_LEVELS = [
-  { label: 'Tiết kiệm', value: 'budget' },
-  { label: 'Thoải mái', value: 'comfort' },
-  { label: 'Sang trọng', value: 'luxury' },
+const TRAVEL_TYPES = [
+  { value: 'solo',   label: '🧍 Solo',      desc: 'Một mình' },
+  { value: 'couple', label: '👫 Cặp đôi',   desc: 'Lãng mạn' },
+  { value: 'family', label: '👨‍👩‍👧 Gia đình', desc: 'Có trẻ em' },
+  { value: 'group',  label: '👥 Nhóm bạn',  desc: 'Vui vẻ' },
 ];
+
+const TRENDING = ['Hà Nội', 'Paris', 'Đà Nẵng', 'Tokyo', 'Phú Quốc'];
 
 const D = {
   bg: '#0d1117', surface: '#161b22', surface2: '#1c2128',
@@ -42,75 +44,159 @@ const D = {
 export default function CreateTripPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    destination: '', start_date: '', duration_days: 7,
-    budget: 5000000, num_people: 2, transport_mode: '',
-    accommodation_type: '', accommodation_area: '', arrival_time: '14:00',
-    preferences: [] as string[], notes: '',
+    destination: '',
+    origin: '',
+    start_date: '',
+    duration_days: 7,
+    budget: 5000000,
+    budget_input: '5000000',    // controlled text input for manual entry
+    num_people: 2,
+    travel_type: '',
+    transport_mode: '',
+    accommodation_type: '',
+    accommodation_area: '',
+    arrival_time: '14:00',
+    preferences: [] as string[],
+    notes: '',
   });
-  const [budgetLevel, setBudgetLevel] = useState<'budget' | 'comfort' | 'luxury'>('comfort');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState<{ tripId: number; destination: string } | null>(null);
+
+  // Destination autocomplete state
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const destDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Origin autocomplete state
+  const [originSuggestions, setOriginSuggestions] = useState<NominatimResult[]>([]);
+  const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+  const originDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
 
+  // ── Destination autocomplete ──────────────────────
   const handleDestinationChange = (value: string) => {
-    setForm({ ...form, destination: value });
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setForm(f => ({ ...f, destination: value }));
+    if (destDebounce.current) clearTimeout(destDebounce.current);
     if (value.length < 2) { setSuggestions([]); return; }
-    debounceRef.current = setTimeout(async () => {
+    destDebounce.current = setTimeout(async () => {
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5`,
-          { headers: { 'Accept-Language': 'vi' } }
+          { headers: { 'Accept-Language': 'vi' } },
         );
-        const data: NominatimResult[] = await res.json();
-        setSuggestions(data);
+        setSuggestions(await res.json());
         setShowSuggestions(true);
       } catch {}
     }, 300);
   };
 
-  const togglePref = (v: string) => {
-    setForm(f => ({
-      ...f,
-      preferences: f.preferences.includes(v) ? f.preferences.filter(p => p !== v) : [...f.preferences, v],
-    }));
+  // ── Origin autocomplete ───────────────────────────
+  const handleOriginChange = (value: string) => {
+    setForm(f => ({ ...f, origin: value }));
+    if (originDebounce.current) clearTimeout(originDebounce.current);
+    if (value.length < 2) { setOriginSuggestions([]); return; }
+    originDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5`,
+          { headers: { 'Accept-Language': 'vi' } },
+        );
+        setOriginSuggestions(await res.json());
+        setShowOriginSuggestions(true);
+      } catch {}
+    }, 300);
   };
 
+  // ── Budget manual input ───────────────────────────
+  const handleBudgetInput = (raw: string) => {
+    // Strip non-numeric except digits
+    const digits = raw.replace(/\D/g, '');
+    const num = digits === '' ? 0 : parseInt(digits, 10);
+    setForm(f => ({ ...f, budget: num, budget_input: digits }));
+  };
+
+  // ── End-date helper ───────────────────────────────
+  const handleEndDate = (endVal: string) => {
+    if (!form.start_date || !endVal) return;
+    const start = new Date(form.start_date);
+    const end   = new Date(endVal);
+    const diff  = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    if (diff >= 1 && diff <= 30) setForm(f => ({ ...f, duration_days: diff }));
+  };
+
+  const endDateValue = form.start_date && form.duration_days
+    ? new Date(new Date(form.start_date).getTime() + (form.duration_days - 1) * 86400000)
+        .toISOString().split('T')[0]
+    : '';
+
+  const togglePref = (v: string) =>
+    setForm(f => ({
+      ...f,
+      preferences: f.preferences.includes(v)
+        ? f.preferences.filter(p => p !== v)
+        : [...f.preferences, v],
+    }));
+
+  // ── Validation ────────────────────────────────────
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.destination) e.destination = 'Vui lòng nhập điểm đến';
-    if (!form.start_date) e.start_date = 'Vui lòng chọn ngày khởi hành';
+    if (!form.destination.trim()) e.destination = 'Vui lòng nhập điểm đến';
+    if (!form.start_date)         e.start_date = 'Vui lòng chọn ngày khởi hành';
     else if (form.start_date < today) e.start_date = 'Ngày bắt đầu phải từ hôm nay trở đi';
     if (form.duration_days < 1 || form.duration_days > 30) e.duration_days = 'Số ngày phải từ 1 đến 30';
-    if (form.budget <= 0) e.budget = 'Ngân sách phải là số dương';
+    if (form.budget <= 0)         e.budget = 'Ngân sách phải là số dương';
     if (form.num_people < 1 || form.num_people > 20) e.num_people = 'Số người phải từ 1 đến 20';
+    if (form.arrival_time && !/^\d{2}:\d{2}$/.test(form.arrival_time))
+      e.arrival_time = 'Giờ đến phải theo định dạng HH:MM';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
+  // ── Submit ────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
     try {
-      const { data } = await api.post('/trips', form);
-      router.push(`/trips/${data.trip_id}`);
+      const payload = {
+        destination:        form.destination,
+        origin:             form.origin || undefined,
+        start_date:         form.start_date,
+        duration_days:      form.duration_days,
+        budget:             form.budget,
+        num_people:         form.num_people,
+        travel_type:        form.travel_type || undefined,
+        transport_mode:     form.transport_mode || undefined,
+        accommodation_type: form.accommodation_type || undefined,
+        accommodation_area: form.accommodation_area || undefined,
+        arrival_time:       form.arrival_time || undefined,
+        preferences:        form.preferences.length ? form.preferences : undefined,
+        notes:              form.notes || undefined,
+      };
+      const { data } = await api.post('/trips', payload);
+      // Đánh dấu đã submit thành công — hiện màn hình chờ, block form
+      setSubmitted({ tripId: data.trip_id, destination: form.destination });
+      // Redirect sau 1.5s để user thấy feedback
+      setTimeout(() => router.push(`/trips/${data.trip_id}`), 1500);
     } catch (err: unknown) {
-      const apiErrors = (err as { response?: { data?: { errors?: Record<string, string[]> } } })?.response?.data?.errors;
+      const apiErrors = (err as { response?: { data?: { errors?: Record<string, string[]> } } })
+        ?.response?.data?.errors;
       if (apiErrors) {
         const flat: Record<string, string> = {};
         Object.entries(apiErrors).forEach(([k, v]) => { flat[k] = v[0]; });
         setErrors(flat);
+      } else {
+        setErrors({ _global: 'Có lỗi xảy ra, vui lòng thử lại.' });
       }
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Compute end date for preview
-  const endDate = form.start_date
+  // ── Preview helpers ───────────────────────────────
+  const endDateDisplay = form.start_date
     ? new Date(new Date(form.start_date).getTime() + (form.duration_days - 1) * 86400000)
         .toLocaleDateString('vi-VN', { day: '2-digit', month: 'short' })
     : null;
@@ -118,8 +204,48 @@ export default function CreateTripPage() {
     ? new Date(form.start_date).toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
     : null;
 
-  const vibeLabel = BUDGET_LEVELS.find(b => b.value === budgetLevel)?.label ?? 'Thoải mái';
-  const avgBudget = form.duration_days * form.num_people * 500000;
+  // Progress: destination + start_date + budget > 0 + preferences
+  const progressFields = [
+    !!form.destination,
+    !!form.start_date,
+    form.budget > 0,
+    form.preferences.length > 0,
+  ];
+  const progressPct = Math.round((progressFields.filter(Boolean).length / progressFields.length) * 100);
+
+  const travelTypeLabel = TRAVEL_TYPES.find(t => t.value === form.travel_type)?.label ?? '';
+
+  // ── Màn hình chờ sau khi submit thành công ────────
+  if (submitted) {
+    return (
+      <div style={{ minHeight: '100vh', background: D.bg, color: D.text, fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', maxWidth: 480, padding: '0 24px' }}>
+          {/* Spinner */}
+          <div style={{ width: 72, height: 72, borderRadius: '50%', border: '3px solid rgba(79,110,247,0.2)', borderTopColor: '#4f6ef7', animation: 'spin 1s linear infinite', margin: '0 auto 28px' }} />
+
+          <h2 style={{ fontSize: 26, fontWeight: 800, color: D.text, letterSpacing: '-0.8px', margin: '0 0 10px' }}>
+            AI đang tạo lịch trình ✦
+          </h2>
+          <p style={{ fontSize: 15, color: D.textMuted, margin: '0 0 6px' }}>
+            Hành trình đến <strong style={{ color: D.text }}>{submitted.destination.split(',')[0]}</strong> đang được xây dựng.
+          </p>
+          <p style={{ fontSize: 13, color: D.textDim, margin: '0 0 32px' }}>
+            Thường mất 15–45 giây. Đang chuyển trang...
+          </p>
+
+          {/* Manual link phòng khi redirect chậm */}
+          <button
+            onClick={() => router.push(`/trips/${submitted.tripId}`)}
+            style={{ padding: '11px 28px', borderRadius: 10, border: `1px solid ${D.border2}`, background: D.accentBg, color: '#818cf8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Xem lịch trình ngay →
+          </button>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
 
   return (
     <div style={{ minHeight: '100vh', background: D.bg, color: D.text, fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -135,204 +261,250 @@ export default function CreateTripPage() {
           </p>
         </div>
 
-        {/* 2-column layout */}
         <form onSubmit={handleSubmit}>
+          {errors._global && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>
+              ⚠️ {errors._global}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 24, alignItems: 'start' }}>
 
             {/* ── LEFT COLUMN ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Step 1 — Destination */}
+              {/* ─── Step 1 — Destination + Origin ─── */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: D.accent, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>1</span>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, color: D.text, margin: 0 }}>Chọn điểm đến</h2>
-                </div>
+                <SectionHeader step={1} title="Chọn điểm đến & xuất phát" />
 
-                {/* Search input */}
+                {/* Destination */}
+                <label style={labelStyle}>Điểm đến</label>
                 <div style={{ position: 'relative', marginBottom: 14 }}>
-                  <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: D.textMuted, fontSize: 15, pointerEvents: 'none' }}>🔍</div>
+                  <Prefix>🔍</Prefix>
                   <input
                     value={form.destination}
                     onChange={e => handleDestinationChange(e.target.value)}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     autoComplete="off"
                     placeholder="Tìm thành phố, quốc gia hoặc vùng..."
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      background: D.surface2, border: `1px solid ${errors.destination ? '#f87171' : D.border2}`,
-                      borderRadius: 10, padding: '12px 14px 12px 42px',
-                      fontSize: 14, color: D.text, outline: 'none',
-                    }}
+                    style={inputStyle(!!errors.destination, true)}
                   />
-                  {errors.destination && <p style={{ color: '#f87171', fontSize: 12, marginTop: 5 }}>{errors.destination}</p>}
+                  {errors.destination && <FieldError>{errors.destination}</FieldError>}
                   {showSuggestions && suggestions.length > 0 && (
-                    <div style={{ position: 'absolute', zIndex: 20, width: '100%', background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-                      {suggestions.map((s, i) => (
-                        <button key={i} type="button"
-                          onClick={() => { setForm({ ...form, destination: s.display_name }); setShowSuggestions(false); }}
-                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: D.text, background: 'none', border: 'none', cursor: 'pointer', borderBottom: `1px solid ${D.border}` }}>
-                          📍 {s.display_name}
-                        </button>
-                      ))}
-                    </div>
+                    <AutocompleteDropdown
+                      items={suggestions}
+                      onSelect={name => { setForm(f => ({ ...f, destination: name })); setShowSuggestions(false); }}
+                    />
                   )}
                 </div>
 
                 {/* Trending chips */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: D.textDim, textTransform: 'uppercase', letterSpacing: 1 }}>Xu hướng:</span>
                   {TRENDING.map(t => (
-                    <button key={t} type="button" onClick={() => setForm({ ...form, destination: t })}
-                      style={{ padding: '4px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500, background: D.surface2, border: `1px solid ${D.border2}`, color: D.textMuted, cursor: 'pointer' }}>
-                      {t === 'Tokyo' ? '🇯🇵' : t === 'Paris' ? '🇫🇷' : t === 'Đà Nẵng' ? '🇻🇳' : t === 'Hà Nội' ? '🇻🇳' : '🌴'} {t}
+                    <button key={t} type="button" onClick={() => setForm(f => ({ ...f, destination: t }))}
+                      style={chipStyle}>
+                      {t === 'Tokyo' ? '🇯🇵' : t === 'Paris' ? '🇫🇷' : '🇻🇳'} {t}
                     </button>
                   ))}
                 </div>
+
+                {/* Origin */}
+                <label style={labelStyle}>Điểm xuất phát <Opt /></label>
+                <div style={{ position: 'relative' }}>
+                  <Prefix>📍</Prefix>
+                  <input
+                    value={form.origin}
+                    onChange={e => handleOriginChange(e.target.value)}
+                    onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
+                    autoComplete="off"
+                    placeholder="Bạn đang ở đâu? (để AI ước tính chi phí di chuyển)"
+                    style={inputStyle(false, true)}
+                  />
+                  {showOriginSuggestions && originSuggestions.length > 0 && (
+                    <AutocompleteDropdown
+                      items={originSuggestions}
+                      onSelect={name => { setForm(f => ({ ...f, origin: name })); setShowOriginSuggestions(false); }}
+                    />
+                  )}
+                </div>
               </div>
 
-              {/* Step 2 — Dates */}
+
+              {/* ─── Step 2 — Dates ─── */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: D.accent, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>2</span>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, color: D.text, margin: 0 }}>Khi nào bạn đi?</h2>
-                </div>
+                <SectionHeader step={2} title="Khi nào bạn đi?" />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  {/* Start date */}
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 6 }}>Khởi hành</label>
+                    <label style={labelStyle}>Ngày khởi hành</label>
                     <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, pointerEvents: 'none' }}>📅</span>
+                      <Prefix>📅</Prefix>
                       <input type="date" min={today} value={form.start_date}
-                        onChange={e => setForm({ ...form, start_date: e.target.value })}
-                        style={{ width: '100%', boxSizing: 'border-box', background: D.surface2, border: `1px solid ${errors.start_date ? '#f87171' : D.border2}`, borderRadius: 10, padding: '11px 12px 11px 38px', fontSize: 14, color: D.text, outline: 'none', colorScheme: 'dark' }} />
+                        onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
+                        style={inputStyle(!!errors.start_date, true, { colorScheme: 'dark' })} />
                     </div>
-                    {errors.start_date && <p style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>{errors.start_date}</p>}
+                    {errors.start_date && <FieldError>{errors.start_date}</FieldError>}
                   </div>
+
+                  {/* End date — tính ngược ra duration_days */}
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 6 }}>Số ngày</label>
+                    <label style={labelStyle}>Ngày kết thúc</label>
                     <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, pointerEvents: 'none' }}>🗓</span>
-                      <input type="number" min={1} max={30} value={form.duration_days}
-                        onChange={e => setForm({ ...form, duration_days: +e.target.value })}
-                        style={{ width: '100%', boxSizing: 'border-box', background: D.surface2, border: `1px solid ${errors.duration_days ? '#f87171' : D.border2}`, borderRadius: 10, padding: '11px 12px 11px 38px', fontSize: 14, color: D.text, outline: 'none' }} />
+                      <Prefix>📅</Prefix>
+                      <input type="date"
+                        min={form.start_date || today}
+                        value={endDateValue}
+                        onChange={e => handleEndDate(e.target.value)}
+                        style={inputStyle(!!errors.duration_days, true, { colorScheme: 'dark' })} />
                     </div>
-                    {errors.duration_days && <p style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>{errors.duration_days}</p>}
+                    {errors.duration_days && <FieldError>{errors.duration_days}</FieldError>}
                   </div>
                 </div>
+
+                {/* Duration badge — readonly, tự tính */}
+                {form.duration_days > 0 && form.start_date && endDateValue && (
+                  <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: D.accentBg, border: `1px solid rgba(79,110,247,0.3)` }}>
+                    <span style={{ fontSize: 13 }}>🗓</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#818cf8' }}>{form.duration_days} ngày</span>
+                  </div>
+                )}
               </div>
 
-              {/* Step 3 — Accommodation */}
+              {/* ─── Step 3 — Accommodation ─── */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: D.accent, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>3</span>
+                <SectionHeader step={3} title="Chỗ ở & Giờ đến"
+                  sub="AI dùng thông tin này làm điểm xuất phát mỗi ngày để tính lộ trình tối ưu" />
+
+                <label style={labelStyle}>Loại chỗ ở</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+                  {ACCOMMODATION_TYPES.map(a => {
+                    const active = form.accommodation_type === a.value;
+                    return (
+                      <button key={a.value} type="button"
+                        onClick={() => setForm(f => ({ ...f, accommodation_type: f.accommodation_type === a.value ? '' : a.value }))}
+                        style={cardToggleStyle(active)}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#818cf8' : D.text, marginBottom: 2 }}>{a.label}</div>
+                        <div style={{ fontSize: 11, color: D.textDim }}>{a.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
                   <div>
-                    <h2 style={{ fontSize: 17, fontWeight: 700, color: D.text, margin: 0 }}>Chỗ ở & Giờ đến</h2>
-                    <p style={{ fontSize: 12, color: D.textMuted, margin: '2px 0 0' }}>AI dùng thông tin này làm điểm xuất phát mỗi ngày để tính lộ trình tối ưu</p>
+                    <label style={labelStyle}>
+                      Khu vực / tên chỗ ở <Opt />
+                    </label>
+                    <input value={form.accommodation_area}
+                      onChange={e => setForm(f => ({ ...f, accommodation_area: e.target.value }))}
+                      placeholder="VD: Phố cổ Hà Nội, gần biển Mỹ Khê..."
+                      style={inputStyle(false)} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Giờ đến nơi</label>
+                    <input type="time" value={form.arrival_time}
+                      onChange={e => setForm(f => ({ ...f, arrival_time: e.target.value }))}
+                      onBlur={e => {
+                        if (e.target.value && !/^\d{2}:\d{2}$/.test(e.target.value))
+                          setErrors(prev => ({ ...prev, arrival_time: 'Giờ đến phải theo định dạng HH:MM' }));
+                        else
+                          setErrors(prev => { const n = { ...prev }; delete n.arrival_time; return n; });
+                      }}
+                      style={{ ...inputStyle(!!errors.arrival_time), width: 120, colorScheme: 'dark' as React.CSSProperties['colorScheme'] }} />
+                    {errors.arrival_time && <FieldError>{errors.arrival_time}</FieldError>}
                   </div>
                 </div>
 
-                {/* Accommodation type grid */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 10 }}>Loại chỗ ở</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                    {ACCOMMODATION_TYPES.map(a => {
-                      const active = form.accommodation_type === a.value;
+                {/* <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(79,110,247,0.08)', border: '1px solid rgba(79,110,247,0.2)', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>💡</span>
+                  <p style={{ fontSize: 12, color: D.textMuted, margin: 0, lineHeight: 1.6 }}>
+                    AI sẽ chọn {form.accommodation_type ? ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label : 'chỗ ở'} phù hợp ngân sách, rồi tính khoảng cách từ đó đến từng điểm tham quan mỗi ngày.
+                  </p>
+                </div> */}
+              </div>
+
+
+              {/* ─── Step 4 — Traveler Details ─── */}
+              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
+                <SectionHeader step={4} title="Chi tiết hành khách" />
+
+                {/* Travel type */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={labelStyle}>Loại chuyến đi <Opt /></label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                    {TRAVEL_TYPES.map(t => {
+                      const active = form.travel_type === t.value;
                       return (
-                        <button key={a.value} type="button" onClick={() => setForm(f => ({ ...f, accommodation_type: f.accommodation_type === a.value ? '' : a.value }))}
-                          style={{ padding: '10px 8px', borderRadius: 10, border: `1px solid ${active ? D.accent : D.border2}`, background: active ? D.accentBg : D.surface2, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#818cf8' : D.text, marginBottom: 2 }}>{a.label}</div>
-                          <div style={{ fontSize: 11, color: D.textDim }}>{a.desc}</div>
+                        <button key={t.value} type="button"
+                          onClick={() => {
+                            const next = form.travel_type === t.value ? '' : t.value;
+                            // Auto-set số người hợp lý khi chọn loại
+                            const autoNum = next === 'solo' ? 1 : next === 'couple' ? 2 : form.num_people < 2 ? 2 : form.num_people;
+                            setForm(f => ({ ...f, travel_type: next, num_people: autoNum }));
+                          }}
+                          style={cardToggleStyle(active)}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#818cf8' : D.text, marginBottom: 2 }}>{t.label}</div>
+                          <div style={{ fontSize: 11, color: D.textDim }}>{t.desc}</div>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Area input + arrival time */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 6 }}>
-                      Khu vực / tên chỗ ở <span style={{ color: D.textDim, fontWeight: 400 }}>(tuỳ chọn — AI tự chọn nếu để trống)</span>
-                    </label>
-                    <input value={form.accommodation_area}
-                      onChange={e => setForm({ ...form, accommodation_area: e.target.value })}
-                      placeholder="VD: Phố cổ Hà Nội, gần biển Mỹ Khê..."
-                      style={{ width: '100%', boxSizing: 'border-box', background: D.surface2, border: `1px solid ${D.border2}`, borderRadius: 10, padding: '11px 13px', fontSize: 13, color: D.text, outline: 'none' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 6 }}>Giờ đến nơi</label>
-                    <input type="time" value={form.arrival_time}
-                      onChange={e => setForm({ ...form, arrival_time: e.target.value })}
-                      style={{ background: D.surface2, border: `1px solid ${D.border2}`, borderRadius: 10, padding: '11px 13px', fontSize: 13, color: D.text, outline: 'none', colorScheme: 'dark', width: 120 }} />
-                  </div>
-                </div>
-
-                {/* Info hint */}
-                <div style={{ marginTop: 14, padding: '10px 13px', background: 'rgba(79,110,247,0.08)', border: '1px solid rgba(79,110,247,0.2)', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 14, flexShrink: 0 }}>💡</span>
-                  <p style={{ fontSize: 12, color: D.textMuted, margin: 0, lineHeight: 1.6 }}>
-                    AI sẽ chọn {form.accommodation_type ? ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label : 'chỗ ở'} cụ thể phù hợp ngân sách, rồi tính khoảng cách từ đó đến từng điểm tham quan mỗi ngày.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 4 — Traveler Details */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: D.accent, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>4</span>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, color: D.text, margin: 0 }}>Chi tiết hành khách</h2>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                  {/* People counter */}
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 10 }}>Số hành khách?</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <button type="button" onClick={() => setForm(f => ({ ...f, num_people: Math.max(1, f.num_people - 1) }))}
-                        style={{ width: 34, height: 34, borderRadius: 8, background: D.surface2, border: `1px solid ${D.border2}`, color: D.text, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 18 }}>{'👤'.repeat(Math.min(form.num_people, 3))}</span>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: D.text }}>{form.num_people} người</span>
+                {/* Số hành khách — chỉ hiện khi family/group hoặc chưa chọn */}
+                <div style={{ display: 'grid', gridTemplateColumns: (form.travel_type === 'solo' || form.travel_type === 'couple') ? '1fr' : '1fr 1fr', gap: 24 }}>
+                  {(form.travel_type === '' || form.travel_type === 'family' || form.travel_type === 'group') && (
+                    <div>
+                      <label style={labelStyle}>Số hành khách</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <button type="button"
+                          onClick={() => setForm(f => ({ ...f, num_people: Math.max(form.travel_type === 'family' ? 2 : 3, f.num_people - 1) }))}
+                          style={counterBtnStyle}>−</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 18 }}>{'👤'.repeat(Math.min(form.num_people, 4))}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: D.text }}>{form.num_people} người</span>
+                        </div>
+                        <button type="button"
+                          onClick={() => setForm(f => ({ ...f, num_people: Math.min(20, f.num_people + 1) }))}
+                          style={counterBtnStyle}>+</button>
                       </div>
-                      <button type="button" onClick={() => setForm(f => ({ ...f, num_people: Math.min(20, f.num_people + 1) }))}
-                        style={{ width: 34, height: 34, borderRadius: 8, background: D.surface2, border: `1px solid ${D.border2}`, color: D.text, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
+                      {errors.num_people && <FieldError>{errors.num_people}</FieldError>}
                     </div>
-                    {errors.num_people && <p style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>{errors.num_people}</p>}
-                  </div>
+                  )}
 
-                  {/* Budget slider */}
+                  {/* Budget — manual input */}
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted }}>Mức ngân sách</label>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: D.accent }}>{vibeLabel}</span>
+                    <label style={labelStyle}>Ngân sách (VNĐ)</label>
+                    <div style={{ position: 'relative' }}>
+                      <Prefix>💰</Prefix>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.budget_input === '' ? '' : Number(form.budget_input).toLocaleString('vi-VN')}
+                        onChange={e => handleBudgetInput(e.target.value)}
+                        placeholder="VD: 5,000,000"
+                        style={inputStyle(!!errors.budget, true)}
+                      />
                     </div>
-                    <input type="range" min={0} max={2} step={1}
-                      value={['budget','comfort','luxury'].indexOf(budgetLevel)}
-                      onChange={e => {
-                        const lvl = (['budget','comfort','luxury'] as const)[+e.target.value];
-                        setBudgetLevel(lvl);
-                        setForm(f => ({ ...f, budget: lvl === 'budget' ? avgBudget * 0.6 : lvl === 'luxury' ? avgBudget * 2 : avgBudget }));
-                      }}
-                      style={{ width: '100%', accentColor: D.accent, cursor: 'pointer' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                      {BUDGET_LEVELS.map(b => (
-                        <span key={b.value} style={{ fontSize: 11, color: budgetLevel === b.value ? D.accent : D.textDim }}>{b.label}</span>
-                      ))}
-                    </div>
-                    <p style={{ fontSize: 12, color: D.textMuted, marginTop: 8 }}>
-                      Ước tính: <span style={{ color: '#34d399', fontWeight: 600 }}>{formatCurrency(form.budget)}</span>
-                    </p>
-                    {errors.budget && <p style={{ color: '#f87171', fontSize: 12, marginTop: 2 }}>{errors.budget}</p>}
+                    {errors.budget
+                      ? <FieldError>{errors.budget}</FieldError>
+                      : form.budget > 0 && (
+                        <p style={{ fontSize: 12, color: '#34d399', marginTop: 5 }}>
+                          ≈ {formatCurrency(form.budget / form.num_people)} / người
+                        </p>
+                      )
+                    }
                   </div>
                 </div>
 
                 {/* Transport */}
                 <div style={{ marginTop: 18 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 8 }}>Phương tiện di chuyển</label>
+                  <label style={labelStyle}>Phương tiện di chuyển <Opt /></label>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {TRANSPORT_MODES.map(m => (
-                      <button key={m.value} type="button" onClick={() => setForm(f => ({ ...f, transport_mode: f.transport_mode === m.value ? '' : m.value }))}
-                        style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: `1px solid ${form.transport_mode === m.value ? D.accent : D.border2}`, background: form.transport_mode === m.value ? D.accentBg : D.surface2, color: form.transport_mode === m.value ? '#818cf8' : D.textMuted }}>
+                      <button key={m.value} type="button"
+                        onClick={() => setForm(f => ({ ...f, transport_mode: f.transport_mode === m.value ? '' : m.value }))}
+                        style={toggleChipStyle(form.transport_mode === m.value)}>
                         {m.label}
                       </button>
                     ))}
@@ -340,12 +512,10 @@ export default function CreateTripPage() {
                 </div>
               </div>
 
-              {/* Step 5 — Interests */}
+
+              {/* ─── Step 5 — Interests ─── */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: D.accent, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>5</span>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, color: D.text, margin: 0 }}>Sở thích & Phong cách</h2>
-                </div>
+                <SectionHeader step={5} title="Sở thích & Phong cách" />
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10, marginBottom: 18 }}>
                   {PREFERENCES.map(p => {
@@ -361,62 +531,62 @@ export default function CreateTripPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 6 }}>Ghi chú tùy chỉnh AI</label>
-                  <textarea rows={3} maxLength={500} value={form.notes}
-                    onChange={e => setForm({ ...form, notes: e.target.value })}
-                    placeholder="Mô tả chuyến đi mơ ước của bạn..."
+                  <label style={labelStyle}>Ghi chú thêm cho AI <Opt /></label>
+                  <textarea rows={3} maxLength={1000} value={form.notes}
+                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="Mô tả yêu cầu đặc biệt, hạn chế ăn uống, mong muốn cụ thể..."
                     style={{ width: '100%', boxSizing: 'border-box', resize: 'none', background: D.surface2, border: `1px solid ${D.border2}`, borderRadius: 10, padding: '10px 13px', fontSize: 13, color: D.text, outline: 'none', lineHeight: 1.6 }} />
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    {['✨ Chill vibes', '👨‍👩‍👧 Gia đình', '🎒 Phượt thủ'].map(tag => (
-                      <button key={tag} type="button" onClick={() => setForm(f => ({ ...f, notes: f.notes ? f.notes + ' ' + tag : tag }))}
-                        style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, background: D.surface, border: `1px solid ${D.border2}`, color: D.textMuted, cursor: 'pointer' }}>
-                        {tag}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {['✨ Chill vibes', '👨‍👩‍👧 Gia đình', '🎒 Phượt thủ'].map(tag => (
+                        <button key={tag} type="button"
+                          onClick={() => setForm(f => ({ ...f, notes: f.notes ? f.notes + ' ' + tag : tag }))}
+                          style={chipStyle}>
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 11, color: D.textDim }}>{form.notes.length}/1000</span>
                   </div>
                 </div>
               </div>
 
-              {/* Submit */}
+              {/* ─── Submit ─── */}
               <div>
-                <button type="submit" disabled={loading}
-                  style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: loading ? 'rgba(79,110,247,0.5)' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: '-0.2px' }}>
+                <button type="submit" disabled={loading || !!submitted}
+                  style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: (loading || submitted) ? 'rgba(79,110,247,0.5)' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: (loading || submitted) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: '-0.2px' }}>
                   {loading ? (
                     <>
                       <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      AI đang tạo lịch trình...
+                      Đang gửi yêu cầu...
                     </>
+                  ) : submitted ? (
+                    <>✓ Đã tạo, đang chuyển trang...</>
                   ) : (
                     <>✦ Tạo lịch trình với AI</>
                   )}
                 </button>
                 <p style={{ textAlign: 'center', fontSize: 12, color: D.textDim, marginTop: 10 }}>
-                  Thời gian tạo ước tính: 15–30 giây
+                  Thời gian tạo ước tính: 15–45 giây
                 </p>
               </div>
             </div>
 
+
             {/* ── RIGHT COLUMN — Preview Panel ── */}
             <div style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* Map preview card */}
+              {/* Map preview */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, overflow: 'hidden' }}>
-                {/* Map area */}
                 <div style={{ position: 'relative', height: 180, background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #091420 100%)', overflow: 'hidden' }}>
                   <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.15 }}>
-                    {[...Array(7)].map((_, i) => (
-                      <line key={`h${i}`} x1="0" y1={`${i * 16}%`} x2="100%" y2={`${i * 16}%`} stroke="#4f6ef7" strokeWidth="0.5" />
-                    ))}
-                    {[...Array(10)].map((_, i) => (
-                      <line key={`v${i}`} x1={`${i * 11}%`} y1="0" x2={`${i * 11}%`} y2="100%" stroke="#4f6ef7" strokeWidth="0.5" />
-                    ))}
+                    {[...Array(7)].map((_, i) => <line key={`h${i}`} x1="0" y1={`${i * 16}%`} x2="100%" y2={`${i * 16}%`} stroke="#4f6ef7" strokeWidth="0.5" />)}
+                    {[...Array(10)].map((_, i) => <line key={`v${i}`} x1={`${i * 11}%`} y1="0" x2={`${i * 11}%`} y2="100%" stroke="#4f6ef7" strokeWidth="0.5" />)}
                     <polyline points="60,140 130,90 220,60 300,110 360,40" fill="none" stroke="#4f6ef7" strokeWidth="2" strokeDasharray="6,3" opacity="0.8" />
                   </svg>
-                  {/* Pin */}
                   <div style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%,-50%)' }}>
                     <div style={{ width: 32, height: 32, borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)', background: '#4f6ef7', border: '2px solid rgba(255,255,255,0.4)', boxShadow: '0 0 16px rgba(79,110,247,0.7)' }} />
                   </div>
-                  {/* Live badge */}
                   <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 99, padding: '4px 12px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                     {form.destination ? `📍 ${form.destination.split(',')[0]}` : 'Chọn điểm đến...'}
                   </div>
@@ -431,22 +601,21 @@ export default function CreateTripPage() {
                         {form.destination ? form.destination.split(',')[0] : 'Điểm đến'}
                       </h3>
                       <p style={{ fontSize: 12, color: D.textMuted, margin: 0 }}>
-                        {startFmt ? `${startFmt}${endDate ? ` — ${endDate}` : ''}` : 'Chọn ngày đi'} · {form.num_people} người
+                        {startFmt ? `${startFmt}${endDateDisplay ? ` — ${endDateDisplay}` : ''}` : 'Chọn ngày đi'} · {form.num_people} người
+                        {travelTypeLabel && ` · ${travelTypeLabel}`}
                       </p>
                     </div>
                     <div style={{ width: 28, height: 28, borderRadius: 8, background: D.accentBg, border: `1px solid ${D.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🗺</div>
                   </div>
 
-                  {/* Progress bar */}
+                  {/* Progress bar — fixed max 100% */}
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontSize: 11, color: D.textMuted }}>AI Logic Loading</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: D.accent }}>
-                        {Math.min(100, [form.destination, form.start_date, form.num_people > 1].filter(Boolean).length * 33 + (form.preferences.length > 0 ? 1 : 0))}%
-                      </span>
+                      <span style={{ fontSize: 11, color: D.textMuted }}>Thông tin cần thiết</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: D.accent }}>{progressPct}%</span>
                     </div>
                     <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: `linear-gradient(90deg, #4f6ef7, #06b6d4)`, borderRadius: 99, width: `${Math.min(100, [form.destination, form.start_date, form.num_people > 1].filter(Boolean).length * 33 + (form.preferences.length > 0 ? 1 : 0))}%`, transition: 'width 0.4s ease' }} />
+                      <div style={{ height: '100%', background: 'linear-gradient(90deg, #4f6ef7, #06b6d4)', borderRadius: 99, width: `${progressPct}%`, transition: 'width 0.4s ease' }} />
                     </div>
                   </div>
 
@@ -457,13 +626,14 @@ export default function CreateTripPage() {
                       <div style={{ fontSize: 14, fontWeight: 700, color: D.text }}>{formatCurrency(form.budget)}</div>
                     </div>
                     <div style={{ background: D.surface2, borderRadius: 10, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 10, color: D.textDim, marginBottom: 3 }}>Phong cách</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: D.text }}>{vibeLabel}</div>
+                      <div style={{ fontSize: 10, color: D.textDim, marginBottom: 3 }}>Mỗi người</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: D.text }}>
+                        {form.num_people > 0 ? formatCurrency(form.budget / form.num_people) : '—'}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
 
-                  {/* Accommodation preview row */}
+                  {/* Accommodation row */}
                   <div style={{ background: D.surface2, borderRadius: 10, padding: '9px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 15 }}>
                       {ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label.split(' ')[0] || '🏨'}
@@ -491,7 +661,7 @@ export default function CreateTripPage() {
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: i === 2 ? D.textDim : D.accent, flexShrink: 0 }} />
                         <span style={{ color: i === 2 ? D.textDim : D.textMuted }}>
-                          {i === 2 ? 'AI đang tạo thêm...' : `Ngày ${i + 1}: ${form.destination ? form.destination.split(',')[0] : '—'}`}
+                          {i === 2 && form.duration_days > 3 ? `+ ${form.duration_days - 2} ngày nữa...` : `Ngày ${i + 1}: ${form.destination ? form.destination.split(',')[0] : '—'}`}
                         </span>
                       </div>
                     ))}
@@ -499,16 +669,16 @@ export default function CreateTripPage() {
                 </div>
               </div>
 
-              {/* AI Suggestion card */}
-              <div style={{ background: D.surface, border: `1px solid rgba(79,110,247,0.3)`, borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: D.accentBg, border: `1px solid ${D.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>📍</div>
+              {/* AI suggestion card */}
+              <div style={{ background: D.surface, border: '1px solid rgba(79,110,247,0.3)', borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: D.accentBg, border: `1px solid ${D.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>✦</div>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginBottom: 4 }}>Gợi ý AI</div>
                   <p style={{ fontSize: 12, color: D.textMuted, margin: 0, lineHeight: 1.6 }}>
                     {form.destination && form.accommodation_type
-                      ? `AI sẽ chọn ${ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label} tại ${form.destination.split(',')[0]}${form.accommodation_area ? ` (${form.accommodation_area})` : ''} làm điểm gốc, rồi tối ưu lộ trình từng ngày từ đó.`
+                      ? `AI sẽ chọn ${ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label} tại ${form.destination.split(',')[0]}${form.accommodation_area ? ` (${form.accommodation_area})` : ''} làm điểm gốc${form.origin ? `, tính chi phí từ ${form.origin.split(',')[0]}` : ''}.`
                       : form.destination
-                      ? `Chọn loại chỗ ở để AI tính lộ trình tối ưu từ điểm xuất phát mỗi ngày.`
+                      ? 'Chọn loại chỗ ở để AI tính lộ trình tối ưu từ điểm xuất phát mỗi ngày.'
                       : 'Nhập điểm đến và AI sẽ phân tích thời tiết, chọn chỗ ở phù hợp, rồi tối ưu lộ trình từng ngày.'}
                   </p>
                 </div>
@@ -516,17 +686,124 @@ export default function CreateTripPage() {
             </div>
 
           </div>
-          </div>
         </form>
       </div>
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
-        input::placeholder { color: rgba(255,255,255,0.25); }
-        textarea::placeholder { color: rgba(255,255,255,0.25); }
+        input[type=date]::-webkit-calendar-picker-indicator,
+        input[type=time]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
+        input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
         input[type=range] { height: 4px; }
       `}</style>
+    </div>
+  );
+}
+
+
+// ─── Shared style helpers ─────────────────────────────────────────────────────
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.45)',
+  display: 'block', marginBottom: 6,
+};
+
+function Opt() {
+  return <span style={{ color: 'rgba(255,255,255,0.22)', fontWeight: 400 }}>(tuỳ chọn)</span>;
+}
+
+function Prefix({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, pointerEvents: 'none' }}>
+      {children}
+    </span>
+  );
+}
+
+function FieldError({ children }: { children: React.ReactNode }) {
+  return <p style={{ color: '#f87171', fontSize: 12, marginTop: 5 }}>{children}</p>;
+}
+
+function inputStyle(
+  hasError: boolean,
+  hasPrefix = false,
+  extra: React.CSSProperties = {},
+): React.CSSProperties {
+  return {
+    width: '100%', boxSizing: 'border-box',
+    background: '#1c2128',
+    border: `1px solid ${hasError ? '#f87171' : 'rgba(255,255,255,0.12)'}`,
+    borderRadius: 10,
+    padding: `11px 13px 11px ${hasPrefix ? '38px' : '13px'}`,
+    fontSize: 14, color: '#e6edf3', outline: 'none',
+    ...extra,
+  };
+}
+
+function cardToggleStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '10px 8px', borderRadius: 10,
+    border: `1px solid ${active ? '#4f6ef7' : 'rgba(255,255,255,0.12)'}`,
+    background: active ? 'rgba(79,110,247,0.12)' : '#1c2128',
+    cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+  };
+}
+
+function toggleChipStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+    cursor: 'pointer',
+    border: `1px solid ${active ? '#4f6ef7' : 'rgba(255,255,255,0.12)'}`,
+    background: active ? 'rgba(79,110,247,0.12)' : '#1c2128',
+    color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
+  };
+}
+
+const chipStyle: React.CSSProperties = {
+  padding: '4px 10px', borderRadius: 99, fontSize: 11,
+  background: '#161b22', border: '1px solid rgba(255,255,255,0.12)',
+  color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+};
+
+const counterBtnStyle: React.CSSProperties = {
+  width: 34, height: 34, borderRadius: 8,
+  background: '#1c2128', border: '1px solid rgba(255,255,255,0.12)',
+  color: '#e6edf3', fontSize: 18, cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SectionHeader({ step, title, sub }: { step: number; title: string; sub?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+      <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#4f6ef7', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {step}
+      </span>
+      <div>
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#e6edf3', margin: 0 }}>{title}</h2>
+        {sub && <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', margin: '2px 0 0' }}>{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function AutocompleteDropdown({
+  items,
+  onSelect,
+}: {
+  items: NominatimResult[];
+  onSelect: (name: string) => void;
+}) {
+  return (
+    <div style={{ position: 'absolute', zIndex: 20, width: '100%', background: '#161b22', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+      {items.map((s, i) => (
+        <button key={i} type="button"
+          onClick={() => onSelect(s.display_name)}
+          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#e6edf3', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          📍 {s.display_name}
+        </button>
+      ))}
     </div>
   );
 }

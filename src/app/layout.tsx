@@ -17,7 +17,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" className={inter.variable}>
-      <body className={`min-h-screen ${inter.className}`}>{children}</body>
+      <body className={`min-h-screen ${inter.className}`}>
+        <AuthSync />
+        {children}
+      </body>
     </html>
   );
 }
