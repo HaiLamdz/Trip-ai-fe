@@ -12,22 +12,37 @@ export function useTripStatus(tripId: string | number, enabled = true) {
   const [status, setStatus] = useState<TripStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track previous status để tránh trigger fetchTrip nhiều lần
+  const prevStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !tripId) return;
+    // Reset khi enable thay đổi
+    if (!enabled) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    if (!tripId) return;
 
     const poll = async () => {
       try {
         const { data } = await api.get<TripStatus>(`/trips/${tripId}/status`);
         setStatus(data);
+        prevStatusRef.current = data.status;
 
         if (data.status === 'completed' || data.status === 'failed') {
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Lỗi kết nối';
         setError(msg);
-        if (intervalRef.current) clearInterval(intervalRef.current);
+        // Không stop poll khi lỗi mạng tạm thời — thử lại sau
       }
     };
 
@@ -35,7 +50,10 @@ export function useTripStatus(tripId: string | number, enabled = true) {
     intervalRef.current = setInterval(poll, 3000);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [tripId, enabled]);
 

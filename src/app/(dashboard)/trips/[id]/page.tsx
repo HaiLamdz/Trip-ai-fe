@@ -99,8 +99,6 @@ export default function TripDetailPage() {
   const isProcessing = trip?.status === 'processing' || (!trip && loading);
   const { status: pollStatus } = useTripStatus(id, isProcessing);
 
-  useEffect(() => { if (pollStatus?.status === 'completed') fetchTrip(); }, [pollStatus?.status]); // eslint-disable-line
-
   const fetchTrip = useCallback(async () => {
     try {
       const { data } = await api.get(`/trips/${id}`);
@@ -111,7 +109,16 @@ export default function TripDetailPage() {
     finally { setLoading(false); }
   }, [id, router]);
 
+  // Initial load
   useEffect(() => { fetchTrip(); }, [fetchTrip]);
+
+  // When poll detects completed/failed → reload full trip data
+  useEffect(() => {
+    if (pollStatus?.status === 'completed' || pollStatus?.status === 'failed') {
+      fetchTrip();
+    }
+  }, [pollStatus?.status, fetchTrip]);
+
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
   const handleNotesChange = (val: string) => {
@@ -218,29 +225,135 @@ export default function TripDetailPage() {
 
   // ── Loading states ────────────────────────────────────────────────────────
   if (loading || trip?.status === 'processing') {
-    return (
-      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', maxWidth: 360 }}>
-          <div style={{ fontSize: 48, marginBottom: 20 }}>🤖</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: D.text, marginBottom: 8 }}>AI đang tạo lịch trình</h2>
-          <p style={{ color: D.textMuted, marginBottom: 24, fontSize: 15 }}>{pollStatus?.progress_message || 'Đang xử lý…'}</p>
-          <div style={{ width: '100%', height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ width: '65%', height: '100%', background: D.accent, borderRadius: 99 }} />
-          </div>
-          <p style={{ fontSize: 13, color: D.textDim, marginTop: 12 }}>Thường mất 15–30 giây</p>
-        </div>
-      </div>
-    );
-  }
+    const isCompleted = pollStatus?.status === 'completed';
+    const isFailed    = pollStatus?.status === 'failed';
 
-  if (trip?.status === 'failed') {
+    // Tính progress dựa trên elapsed time (ước lượng 60s cho trip 4 ngày)
+    // Dùng animated CSS thay vì JS timer cho smooth effect
+
     return (
-      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>😞</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: D.text, marginBottom: 8 }}>Tạo lịch trình thất bại</h2>
-          <p style={{ color: D.textMuted, marginBottom: 24 }}>Đã có lỗi xảy ra. Vui lòng thử lại.</p>
-          <button onClick={() => router.push('/trips/create')} style={{ background: D.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Thử lại</button>
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: D.bg, fontFamily: 'Inter, system-ui, sans-serif',
+      }}>
+        <style>{`
+          @keyframes pulse-bot {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+          }
+          @keyframes progress-indeterminate {
+            0%   { left: -40%; width: 40%; }
+            50%  { left: 20%;  width: 60%; }
+            100% { left: 100%; width: 40%; }
+          }
+          @keyframes progress-fill {
+            from { width: 5%; }
+            to   { width: 92%; }
+          }
+          @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes dot-bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40%           { transform: translateY(-8px); }
+          }
+        `}</style>
+
+        <div style={{
+          textAlign: 'center', maxWidth: 420, padding: '0 24px', width: '100%',
+          animation: 'fade-in-up 0.5s ease both',
+        }}>
+          {/* Robot icon */}
+          <div style={{
+            fontSize: 72, marginBottom: 28, lineHeight: 1,
+            animation: isCompleted ? 'none' : 'pulse-bot 2s ease-in-out infinite',
+            filter: isCompleted ? 'drop-shadow(0 0 24px rgba(52,211,153,0.5))' : 'drop-shadow(0 0 20px rgba(79,110,247,0.4))',
+          }}>
+            🤖
+          </div>
+
+          {/* Title */}
+          <h2 style={{
+            fontSize: 26, fontWeight: 800, color: D.text,
+            letterSpacing: '-0.8px', margin: '0 0 10px',
+          }}>
+            {isCompleted
+              ? '✅ Lịch trình đã sẵn sàng!'
+              : isFailed
+                ? '😞 Tạo lịch trình thất bại'
+                : 'AI đang tạo lịch trình'}
+          </h2>
+
+          {/* Subtitle */}
+          <p style={{ fontSize: 15, color: D.textMuted, margin: '0 0 32px', lineHeight: 1.6 }}>
+            {isCompleted
+              ? 'Đang tải chi tiết lịch trình...'
+              : isFailed
+                ? 'Đã xảy ra lỗi. Vui lòng thử lại.'
+                : (pollStatus?.progress_message || 'Đang phân tích điểm đến và lên kế hoạch…')}
+          </p>
+
+          {/* Progress bar */}
+          {!isFailed && (
+            <div style={{
+              position: 'relative', width: '100%', height: 4,
+              background: 'rgba(255,255,255,0.07)', borderRadius: 99, overflow: 'hidden',
+              marginBottom: 16,
+            }}>
+              {isCompleted ? (
+                /* Full bar khi xong */
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'linear-gradient(90deg, #34d399, #4f6ef7)',
+                  borderRadius: 99, transition: 'width 0.5s ease',
+                }} />
+              ) : (
+                /* Indeterminate animation khi đang chạy */
+                <div style={{
+                  position: 'absolute', top: 0, bottom: 0,
+                  background: 'linear-gradient(90deg, transparent, #4f6ef7, #818cf8, transparent)',
+                  borderRadius: 99,
+                  animation: 'progress-indeterminate 1.8s ease-in-out infinite',
+                }} />
+              )}
+            </div>
+          )}
+
+          {/* Step dots */}
+          {!isCompleted && !isFailed && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 20 }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: D.accent, opacity: 0.7,
+                  animation: `dot-bounce 1.4s ease-in-out ${i * 0.2}s infinite`,
+                }} />
+              ))}
+            </div>
+          )}
+
+          <p style={{ fontSize: 13, color: D.textDim, margin: 0 }}>
+            {isCompleted
+              ? 'Chuyển trang trong giây lát...'
+              : isFailed
+                ? ''
+                : 'Thường mất 20–60 giây tùy số ngày'}
+          </p>
+
+          {/* Failed action */}
+          {isFailed && (
+            <button
+              onClick={() => router.push('/trips/create')}
+              style={{
+                marginTop: 24, padding: '11px 28px', borderRadius: 10,
+                border: 'none', background: D.accent, color: '#fff',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Tạo lại lịch trình
+            </button>
+          )}
         </div>
       </div>
     );

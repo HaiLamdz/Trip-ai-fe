@@ -61,7 +61,6 @@ export default function CreateTripPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState<{ tripId: number; destination: string } | null>(null);
 
   // Destination autocomplete state
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
@@ -176,19 +175,26 @@ export default function CreateTripPage() {
         notes:              form.notes || undefined,
       };
       const { data } = await api.post('/trips', payload);
-      // Đánh dấu đã submit thành công — hiện màn hình chờ, block form
-      setSubmitted({ tripId: data.trip_id, destination: form.destination });
-      // Redirect sau 1.5s để user thấy feedback
-      setTimeout(() => router.push(`/trips/${data.trip_id}`), 1500);
+      // Redirect ngay sang trang detail — trang đó sẽ tự poll status và hiện loading
+      router.push(`/trips/${data.trip_id}`);
     } catch (err: unknown) {
-      const apiErrors = (err as { response?: { data?: { errors?: Record<string, string[]> } } })
-        ?.response?.data?.errors;
+      console.error('[CreateTrip] submit error:', err);
+      const apiErr = err as { response?: { status?: number; data?: { errors?: Record<string, string[]>; message?: string } }; code?: string; message?: string };
+      
+      // Timeout
+      if (apiErr.code === 'ECONNABORTED' || apiErr.message?.includes('timeout')) {
+        setErrors({ _global: 'Kết nối quá chậm. Vui lòng thử lại.' });
+        return;
+      }
+
+      const apiErrors = apiErr.response?.data?.errors;
       if (apiErrors) {
         const flat: Record<string, string> = {};
         Object.entries(apiErrors).forEach(([k, v]) => { flat[k] = v[0]; });
         setErrors(flat);
       } else {
-        setErrors({ _global: 'Có lỗi xảy ra, vui lòng thử lại.' });
+        const msg = apiErr.response?.data?.message || apiErr.message || 'Có lỗi xảy ra, vui lòng thử lại.';
+        setErrors({ _global: msg });
       }
     } finally {
       setLoading(false);
@@ -214,38 +220,6 @@ export default function CreateTripPage() {
   const progressPct = Math.round((progressFields.filter(Boolean).length / progressFields.length) * 100);
 
   const travelTypeLabel = TRAVEL_TYPES.find(t => t.value === form.travel_type)?.label ?? '';
-
-  // ── Màn hình chờ sau khi submit thành công ────────
-  if (submitted) {
-    return (
-      <div style={{ minHeight: '100vh', background: D.bg, color: D.text, fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', maxWidth: 480, padding: '0 24px' }}>
-          {/* Spinner */}
-          <div style={{ width: 72, height: 72, borderRadius: '50%', border: '3px solid rgba(79,110,247,0.2)', borderTopColor: '#4f6ef7', animation: 'spin 1s linear infinite', margin: '0 auto 28px' }} />
-
-          <h2 style={{ fontSize: 26, fontWeight: 800, color: D.text, letterSpacing: '-0.8px', margin: '0 0 10px' }}>
-            AI đang tạo lịch trình ✦
-          </h2>
-          <p style={{ fontSize: 15, color: D.textMuted, margin: '0 0 6px' }}>
-            Hành trình đến <strong style={{ color: D.text }}>{submitted.destination.split(',')[0]}</strong> đang được xây dựng.
-          </p>
-          <p style={{ fontSize: 13, color: D.textDim, margin: '0 0 32px' }}>
-            Thường mất 15–45 giây. Đang chuyển trang...
-          </p>
-
-          {/* Manual link phòng khi redirect chậm */}
-          <button
-            onClick={() => router.push(`/trips/${submitted.tripId}`)}
-            style={{ padding: '11px 28px', borderRadius: 10, border: `1px solid ${D.border2}`, background: D.accentBg, color: '#818cf8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-          >
-            Xem lịch trình ngay →
-          </button>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
 
   return (
     <div style={{ minHeight: '100vh', background: D.bg, color: D.text, fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -553,15 +527,13 @@ export default function CreateTripPage() {
 
               {/* ─── Submit ─── */}
               <div>
-                <button type="submit" disabled={loading || !!submitted}
-                  style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: (loading || submitted) ? 'rgba(79,110,247,0.5)' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: (loading || submitted) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: '-0.2px' }}>
+                <button type="submit" disabled={loading}
+                  style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: loading ? 'rgba(79,110,247,0.5)' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: '-0.2px' }}>
                   {loading ? (
                     <>
                       <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                       Đang gửi yêu cầu...
                     </>
-                  ) : submitted ? (
-                    <>✓ Đã tạo, đang chuyển trang...</>
                   ) : (
                     <>✦ Tạo lịch trình với AI</>
                   )}
