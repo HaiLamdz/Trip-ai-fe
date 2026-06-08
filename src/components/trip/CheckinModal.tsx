@@ -44,11 +44,11 @@ interface Props {
 }
 
 const D = {
-  bg: '#0d1117', surface: '#161b22', surface2: '#1c2128',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.12)',
-  text: '#e6edf3', textMuted: 'rgba(255,255,255,0.45)', textDim: 'rgba(255,255,255,0.25)',
-  accent: '#4f6ef7', accentBg: 'rgba(79,110,247,0.12)',
-  green: '#34d399', greenBg: 'rgba(52,211,153,0.12)',
+  bg: '#f8fafc', surface: '#ffffff', surface2: '#f1f5f9',
+  border: 'rgba(0,0,0,0.06)', border2: '#e2e8f0',
+  text: '#1e293b', textMuted: '#64748b', textDim: '#94a3b8',
+  accent: '#4f6ef7', accentBg: 'rgba(79,110,247,0.08)',
+  green: '#10b981', greenBg: 'rgba(16,185,129,0.1)',
 };
 
 const EXPENSE_CATEGORIES = [
@@ -149,23 +149,23 @@ export default function CheckinModal({ tripId, place, onSaved, onClose }: Props)
         style={{
           position: 'relative', width: '100%', maxWidth: 520,
           maxHeight: '92vh', overflowY: 'auto',
-          background: D.surface, border: `1px solid ${D.border2}`,
-          borderRadius: 18, boxShadow: '0 28px 64px rgba(0,0,0,0.7)',
+          background: '#fff', border: '1px solid #e2e8f0',
+          borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: `1px solid ${D.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 18 }}>📍</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: D.text }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
                 {isCheckedIn ? 'Cập nhật Check-in' : 'Check-in địa điểm'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: D.textMuted, marginTop: 3, paddingLeft: 26 }}>{place.title}</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, paddingLeft: 26 }}>{place.title}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
         </div>
 
         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -193,10 +193,10 @@ export default function CheckinModal({ tripId, place, onSaved, onClose }: Props)
               onDrop={handleDrop}
               onDragOver={e => e.preventDefault()}
               style={{
-                border: `2px dashed ${photoPreview ? D.accent : D.border2}`,
+                border: `2px dashed ${photoPreview ? D.accent : '#e2e8f0'}`,
                 borderRadius: 12, cursor: 'pointer', overflow: 'hidden', minHeight: 110,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: photoPreview ? 'transparent' : D.surface2, position: 'relative',
+                background: photoPreview ? 'transparent' : '#f8fafc', position: 'relative',
               }}
             >
               {photoPreview ? (
@@ -209,7 +209,7 @@ export default function CheckinModal({ tripId, place, onSaved, onClose }: Props)
                   >✕</button>
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '20px 16px', color: D.textDim }}>
+                <div style={{ textAlign: 'center', padding: '20px 16px', color: '#94a3b8' }}>
                   <div style={{ fontSize: 26, marginBottom: 6 }}>🖼️</div>
                   <div style={{ fontSize: 13 }}>Nhấn hoặc kéo thả ảnh vào đây</div>
                   <div style={{ fontSize: 11, marginTop: 3 }}>JPG, PNG, WEBP · Tối đa 8MB</div>
@@ -233,22 +233,22 @@ export default function CheckinModal({ tripId, place, onSaved, onClose }: Props)
         </div>
 
         {/* ── Footer ── */}
-        <div style={{ padding: '14px 20px 18px', borderTop: `1px solid ${D.border}`, display: 'flex', gap: 10 }}>
+        <div style={{ padding: '14px 20px 18px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 10 }}>
           <button onClick={onClose}
-            style={{ flex: 1, padding: '11px', borderRadius: 10, background: 'transparent', border: `1px solid ${D.border2}`, color: D.textMuted, fontSize: 14, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b', fontSize: 14, cursor: 'pointer' }}>
             Hủy
           </button>
           <button onClick={handleSubmit} disabled={saving}
             style={{
               flex: 2, padding: '11px', borderRadius: 10, border: 'none',
-              background: saving ? D.surface2 : D.green,
-              color: saving ? D.textMuted : '#0d1117',
+              background: saving ? '#e2e8f0' : '#10b981',
+              color: saving ? '#94a3b8' : '#fff',
               fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
             {saving ? (
               <>
-                <span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#000', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                <span style={{ width: 14, height: 14, border: '2px solid rgba(0,0,0,0.15)', borderTopColor: '#64748b', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
                 Đang lưu…
               </>
             ) : (
@@ -266,12 +266,12 @@ export default function CheckinModal({ tripId, place, onSaved, onClose }: Props)
 
 /* ── Shared styles ── */
 const labelSt: React.CSSProperties = {
-  fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.45)',
+  fontSize: 12, fontWeight: 600, color: '#64748b',
   display: 'block', marginBottom: 7, textTransform: 'uppercase', letterSpacing: 0.5,
 };
 const inputSt: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
-  background: '#1c2128', border: '1px solid rgba(255,255,255,0.12)',
+  background: '#f8fafc', border: '1px solid #e2e8f0',
   borderRadius: 10, padding: '9px 13px',
-  fontSize: 13, color: '#e6edf3', outline: 'none',
+  fontSize: 13, color: '#1e293b', outline: 'none',
 };

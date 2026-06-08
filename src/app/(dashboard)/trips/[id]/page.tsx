@@ -409,7 +409,7 @@ export default function TripDetailPage() {
             {/* Label row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2.5px', color: '#7dd3fc', textTransform: 'uppercase' }}>
-                System Processing
+                Đang xử lý
               </span>
               <span style={{ fontSize: 28, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
                 {isCompleted ? '100%' : ''}
@@ -691,7 +691,7 @@ export default function TripDetailPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: D.text }}>TripAI Assistant</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Trợ lý TripAI</span>
                 </div>
                 <div style={{ fontSize: 11, color: D.textMuted, marginTop: 2 }}>{chatCount}/{CHAT_LIMIT} lượt chỉnh sửa</div>
               </div>

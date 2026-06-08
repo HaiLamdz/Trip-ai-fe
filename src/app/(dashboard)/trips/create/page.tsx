@@ -35,10 +35,10 @@ const TRAVEL_TYPES = [
 const TRENDING = ['Hà Nội', 'Paris', 'Đà Nẵng', 'Tokyo', 'Phú Quốc'];
 
 const D = {
-  bg: '#0d1117', surface: '#161b22', surface2: '#1c2128',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.12)',
-  text: '#e6edf3', textMuted: 'rgba(255,255,255,0.45)', textDim: 'rgba(255,255,255,0.22)',
-  accent: '#4f6ef7', accentBg: 'rgba(79,110,247,0.12)',
+  bg: '#f8fafc', surface: '#ffffff', surface2: '#f1f5f9',
+  border: 'rgba(0,0,0,0.06)', border2: '#e2e8f0',
+  text: '#1e293b', textMuted: '#64748b', textDim: '#94a3b8',
+  accent: '#4f6ef7', accentBg: 'rgba(79,110,247,0.08)',
 };
 
 export default function CreateTripPage() {
@@ -249,7 +249,7 @@ export default function CreateTripPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* ─── Step 1 — Destination + Origin ─── */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
+              <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={1} title="Chọn điểm đến & xuất phát" />
 
                 {/* Destination */}
@@ -307,7 +307,7 @@ export default function CreateTripPage() {
 
 
               {/* ─── Step 2 — Dates ─── */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
+              <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={2} title="Khi nào bạn đi?" />
                 <div className="create-dates-grid">
                   {/* Start date */}
@@ -317,7 +317,7 @@ export default function CreateTripPage() {
                       <Prefix>📅</Prefix>
                       <input type="date" min={today} value={form.start_date}
                         onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                        style={inputStyle(!!errors.start_date, true, { colorScheme: 'dark' })} />
+                        style={inputStyle(!!errors.start_date, true, { colorScheme: 'light' })} />
                     </div>
                     {errors.start_date && <FieldError>{errors.start_date}</FieldError>}
                   </div>
@@ -331,7 +331,7 @@ export default function CreateTripPage() {
                         min={form.start_date || today}
                         value={endDateValue}
                         onChange={e => handleEndDate(e.target.value)}
-                        style={inputStyle(!!errors.duration_days, true, { colorScheme: 'dark' })} />
+                        style={inputStyle(!!errors.duration_days, true, { colorScheme: 'light' })} />
                     </div>
                     {errors.duration_days && <FieldError>{errors.duration_days}</FieldError>}
                   </div>
@@ -339,15 +339,15 @@ export default function CreateTripPage() {
 
                 {/* Duration badge — readonly, tự tính */}
                 {form.duration_days > 0 && form.start_date && endDateValue && (
-                  <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: D.accentBg, border: `1px solid rgba(79,110,247,0.3)` }}>
+                  <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(79,110,247,0.08)', border: `1px solid rgba(79,110,247,0.3)` }}>
                     <span style={{ fontSize: 13 }}>🗓</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#818cf8' }}>{form.duration_days} ngày</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#4f6ef7' }}>{form.duration_days} ngày</span>
                   </div>
                 )}
               </div>
 
               {/* ─── Step 3 — Accommodation ─── */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
+              <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={3} title="Chỗ ở & Giờ đến"
                   sub="AI dùng thông tin này làm điểm xuất phát mỗi ngày để tính lộ trình tối ưu" />
 
@@ -359,7 +359,7 @@ export default function CreateTripPage() {
                       <button key={a.value} type="button"
                         onClick={() => setForm(f => ({ ...f, accommodation_type: f.accommodation_type === a.value ? '' : a.value }))}
                         style={cardToggleStyle(active)}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#818cf8' : D.text, marginBottom: 2 }}>{a.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#4f6ef7' : D.text, marginBottom: 2 }}>{a.label}</div>
                         <div style={{ fontSize: 11, color: D.textDim }}>{a.desc}</div>
                       </button>
                     );
@@ -386,7 +386,7 @@ export default function CreateTripPage() {
                         else
                           setErrors(prev => { const n = { ...prev }; delete n.arrival_time; return n; });
                       }}
-                      style={{ ...inputStyle(!!errors.arrival_time), width: 120, colorScheme: 'dark' as React.CSSProperties['colorScheme'] }} />
+                      style={{ ...inputStyle(!!errors.arrival_time), width: 120, colorScheme: 'light' as React.CSSProperties['colorScheme'] }} />
                     {errors.arrival_time && <FieldError>{errors.arrival_time}</FieldError>}
                   </div>
                 </div>
@@ -401,7 +401,7 @@ export default function CreateTripPage() {
 
 
               {/* ─── Step 4 — Traveler Details ─── */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
+              <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={4} title="Chi tiết hành khách" />
 
                 {/* Travel type */}
@@ -419,7 +419,7 @@ export default function CreateTripPage() {
                             setForm(f => ({ ...f, travel_type: next, num_people: autoNum }));
                           }}
                           style={cardToggleStyle(active)}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#818cf8' : D.text, marginBottom: 2 }}>{t.label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#4f6ef7' : D.text, marginBottom: 2 }}>{t.label}</div>
                           <div style={{ fontSize: 11, color: D.textDim }}>{t.desc}</div>
                         </button>
                       );
@@ -466,7 +466,7 @@ export default function CreateTripPage() {
                     {errors.budget
                       ? <FieldError>{errors.budget}</FieldError>
                       : form.budget > 0 && (
-                        <p style={{ fontSize: 12, color: '#34d399', marginTop: 5 }}>
+                        <p style={{ fontSize: 12, color: '#10b981', marginTop: 5 }}>
                           ≈ {formatCurrency(form.budget / form.num_people)} / người
                         </p>
                       )
@@ -491,7 +491,7 @@ export default function CreateTripPage() {
 
 
               {/* ─── Step 5 — Interests ─── */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
+              <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={5} title="Sở thích & Phong cách" />
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10, marginBottom: 18 }}>
@@ -499,7 +499,7 @@ export default function CreateTripPage() {
                     const active = form.preferences.includes(p.value);
                     return (
                       <button key={p.value} type="button" onClick={() => togglePref(p.value)}
-                        style={{ padding: '14px 8px', borderRadius: 12, border: `1px solid ${active ? D.accent : D.border2}`, background: active ? D.accentBg : D.surface2, color: active ? '#818cf8' : D.textMuted, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
+                        style={{ padding: '14px 8px', borderRadius: 12, border: `1px solid ${active ? D.accent : D.border2}`, background: active ? D.accentBg : D.surface2, color: active ? '#4f6ef7' : D.textMuted, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
                         <span style={{ fontSize: 22 }}>{p.label.split(' ')[0]}</span>
                         <span>{p.label.split(' ').slice(1).join(' ') || p.label}</span>
                       </button>
@@ -512,7 +512,7 @@ export default function CreateTripPage() {
                   <textarea rows={3} maxLength={1000} value={form.notes}
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="Mô tả yêu cầu đặc biệt, hạn chế ăn uống, mong muốn cụ thể..."
-                    style={{ width: '100%', boxSizing: 'border-box', resize: 'none', background: D.surface2, border: `1px solid ${D.border2}`, borderRadius: 10, padding: '10px 13px', fontSize: 13, color: D.text, outline: 'none', lineHeight: 1.6 }} />
+                    style={{ width: '100%', boxSizing: 'border-box', resize: 'none', background: '#f8fafc', border: `1px solid #e2e8f0`, borderRadius: 10, padding: '10px 13px', fontSize: 13, color: '#1e293b', outline: 'none', lineHeight: 1.6 }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                     <div style={{ display: 'flex', gap: 8 }}>
                       {['✨ Chill vibes', '👨‍👩‍👧 Gia đình', '🎒 Phượt thủ'].map(tag => (
@@ -523,7 +523,7 @@ export default function CreateTripPage() {
                         </button>
                       ))}
                     </div>
-                    <span style={{ fontSize: 11, color: D.textDim }}>{form.notes.length}/1000</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{form.notes.length}/1000</span>
                   </div>
                 </div>
               </div>
@@ -531,7 +531,7 @@ export default function CreateTripPage() {
               {/* ─── Submit ─── */}
               <div>
                 <button type="submit" disabled={loading}
-                  style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: loading ? 'rgba(79,110,247,0.5)' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: '-0.2px' }}>
+                  style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: loading ? '#93a5fb' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: '-0.2px' }}>
                   {loading ? (
                     <>
                       <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -541,7 +541,7 @@ export default function CreateTripPage() {
                     <>✦ Tạo lịch trình với AI</>
                   )}
                 </button>
-                <p style={{ textAlign: 'center', fontSize: 12, color: D.textDim, marginTop: 10 }}>
+                <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', marginTop: 10 }}>
                   Thời gian tạo ước tính: 15–45 giây
                 </p>
               </div>
@@ -552,7 +552,7 @@ export default function CreateTripPage() {
             <div className="create-preview">
 
               {/* Map preview */}
-              <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <div style={{ position: 'relative', height: 180, background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #091420 100%)', overflow: 'hidden' }}>
                   <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.15 }}>
                     {[...Array(7)].map((_, i) => <line key={`h${i}`} x1="0" y1={`${i * 16}%`} x2="100%" y2={`${i * 16}%`} stroke="#4f6ef7" strokeWidth="0.5" />)}
@@ -589,18 +589,18 @@ export default function CreateTripPage() {
                       <span style={{ fontSize: 11, color: D.textMuted }}>Thông tin cần thiết</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: D.accent }}>{progressPct}%</span>
                     </div>
-                    <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: 4, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
                       <div style={{ height: '100%', background: 'linear-gradient(90deg, #4f6ef7, #06b6d4)', borderRadius: 99, width: `${progressPct}%`, transition: 'width 0.4s ease' }} />
                     </div>
                   </div>
 
                   {/* Stats */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                    <div style={{ background: D.surface2, borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px' }}>
                       <div style={{ fontSize: 10, color: D.textDim, marginBottom: 3 }}>Ngân sách</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: D.text }}>{formatCurrency(form.budget)}</div>
                     </div>
-                    <div style={{ background: D.surface2, borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px' }}>
                       <div style={{ fontSize: 10, color: D.textDim, marginBottom: 3 }}>Mỗi người</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: D.text }}>
                         {form.num_people > 0 ? formatCurrency(form.budget / form.num_people) : '—'}
@@ -609,7 +609,7 @@ export default function CreateTripPage() {
                   </div>
 
                   {/* Accommodation row */}
-                  <div style={{ background: D.surface2, borderRadius: 10, padding: '9px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ background: '#f8fafc', borderRadius: 10, padding: '9px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 15 }}>
                       {ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label.split(' ')[0] || '🏨'}
                     </span>
@@ -625,7 +625,7 @@ export default function CreateTripPage() {
                     {form.arrival_time && (
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: 10, color: D.textDim }}>Đến lúc</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>{form.arrival_time}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#10b981' }}>{form.arrival_time}</div>
                       </div>
                     )}
                   </div>
@@ -634,8 +634,8 @@ export default function CreateTripPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {Array.from({ length: Math.min(form.duration_days, 3) }, (_, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: i === 2 ? D.textDim : D.accent, flexShrink: 0 }} />
-                        <span style={{ color: i === 2 ? D.textDim : D.textMuted }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: i === 2 ? '#cbd5e1' : D.accent, flexShrink: 0 }} />
+                        <span style={{ color: i === 2 ? '#94a3b8' : D.textMuted }}>
                           {i === 2 && form.duration_days > 3 ? `+ ${form.duration_days - 2} ngày nữa...` : `Ngày ${i + 1}: ${form.destination ? form.destination.split(',')[0] : '—'}`}
                         </span>
                       </div>
@@ -645,10 +645,10 @@ export default function CreateTripPage() {
               </div>
 
               {/* AI suggestion card */}
-              <div style={{ background: D.surface, border: '1px solid rgba(79,110,247,0.3)', borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ background: D.surface, border: '1px solid rgba(79,110,247,0.3)', borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: D.accentBg, border: `1px solid ${D.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>✦</div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginBottom: 4 }}>Gợi ý AI</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#4f6ef7', marginBottom: 4 }}>Gợi ý AI</div>
                   <p style={{ fontSize: 12, color: D.textMuted, margin: 0, lineHeight: 1.6 }}>
                     {form.destination && form.accommodation_type
                       ? `AI sẽ chọn ${ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label} tại ${form.destination.split(',')[0]}${form.accommodation_area ? ` (${form.accommodation_area})` : ''} làm điểm gốc${form.origin ? `, tính chi phí từ ${form.origin.split(',')[0]}` : ''}.`
@@ -667,8 +667,8 @@ export default function CreateTripPage() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         input[type=date]::-webkit-calendar-picker-indicator,
-        input[type=time]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
-        input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
+        input[type=time]::-webkit-calendar-picker-indicator { cursor: pointer; }
+        input::placeholder, textarea::placeholder { color: #94a3b8; }
         input[type=range] { height: 4px; }
 
         /* ── Responsive ── */
@@ -766,12 +766,12 @@ export default function CreateTripPage() {
 // ─── Shared style helpers ─────────────────────────────────────────────────────
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.45)',
+  fontSize: 12, fontWeight: 600, color: '#64748b',
   display: 'block', marginBottom: 6,
 };
 
 function Opt() {
-  return <span style={{ color: 'rgba(255,255,255,0.22)', fontWeight: 400 }}>(tuỳ chọn)</span>;
+  return <span style={{ color: '#94a3b8', fontWeight: 400 }}>(tuỳ chọn)</span>;
 }
 
 function Prefix({ children }: { children: React.ReactNode }) {
@@ -793,11 +793,11 @@ function inputStyle(
 ): React.CSSProperties {
   return {
     width: '100%', boxSizing: 'border-box',
-    background: '#1c2128',
-    border: `1px solid ${hasError ? '#f87171' : 'rgba(255,255,255,0.12)'}`,
+    background: '#f8fafc',
+    border: `1px solid ${hasError ? '#f87171' : '#e2e8f0'}`,
     borderRadius: 10,
     padding: `11px 13px 11px ${hasPrefix ? '38px' : '13px'}`,
-    fontSize: 14, color: '#e6edf3', outline: 'none',
+    fontSize: 14, color: '#1e293b', outline: 'none',
     ...extra,
   };
 }
@@ -805,8 +805,8 @@ function inputStyle(
 function cardToggleStyle(active: boolean): React.CSSProperties {
   return {
     padding: '10px 8px', borderRadius: 10,
-    border: `1px solid ${active ? '#4f6ef7' : 'rgba(255,255,255,0.12)'}`,
-    background: active ? 'rgba(79,110,247,0.12)' : '#1c2128',
+    border: `1px solid ${active ? '#4f6ef7' : '#e2e8f0'}`,
+    background: active ? 'rgba(79,110,247,0.08)' : '#f8fafc',
     cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
   };
 }
@@ -815,22 +815,22 @@ function toggleChipStyle(active: boolean): React.CSSProperties {
   return {
     padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
     cursor: 'pointer',
-    border: `1px solid ${active ? '#4f6ef7' : 'rgba(255,255,255,0.12)'}`,
-    background: active ? 'rgba(79,110,247,0.12)' : '#1c2128',
-    color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
+    border: `1px solid ${active ? '#4f6ef7' : '#e2e8f0'}`,
+    background: active ? 'rgba(79,110,247,0.08)' : '#f8fafc',
+    color: active ? '#4f6ef7' : '#64748b',
   };
 }
 
 const chipStyle: React.CSSProperties = {
   padding: '4px 10px', borderRadius: 99, fontSize: 11,
-  background: '#161b22', border: '1px solid rgba(255,255,255,0.12)',
-  color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
+  background: '#f1f5f9', border: '1px solid #e2e8f0',
+  color: '#64748b', cursor: 'pointer',
 };
 
 const counterBtnStyle: React.CSSProperties = {
   width: 34, height: 34, borderRadius: 8,
-  background: '#1c2128', border: '1px solid rgba(255,255,255,0.12)',
-  color: '#e6edf3', fontSize: 18, cursor: 'pointer',
+  background: '#f1f5f9', border: '1px solid #e2e8f0',
+  color: '#1e293b', fontSize: 18, cursor: 'pointer',
   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
 };
 
@@ -843,8 +843,8 @@ function SectionHeader({ step, title, sub }: { step: number; title: string; sub?
         {step}
       </span>
       <div>
-        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#e6edf3', margin: 0 }}>{title}</h2>
-        {sub && <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', margin: '2px 0 0' }}>{sub}</p>}
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', margin: 0 }}>{title}</h2>
+        {sub && <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>{sub}</p>}
       </div>
     </div>
   );
@@ -858,11 +858,11 @@ function AutocompleteDropdown({
   onSelect: (name: string) => void;
 }) {
   return (
-    <div style={{ position: 'absolute', zIndex: 20, width: '100%', background: '#161b22', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+    <div style={{ position: 'absolute', zIndex: 20, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
       {items.map((s, i) => (
         <button key={i} type="button"
           onClick={() => onSelect(s.display_name)}
-          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#e6edf3', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#1e293b', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}>
           📍 {s.display_name}
         </button>
       ))}
