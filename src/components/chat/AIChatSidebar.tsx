@@ -37,8 +37,8 @@ export default function AIChatSidebar({ tripId, onClose, onTimelineUpdate }: Pro
       setMessages(prev => [...prev, { role: 'ai', content: data.message }]);
       setChatCount(data.chat_count || chatCount + 1);
 
-      if (data.updated_timeline?.days) {
-        onTimelineUpdate(data.updated_timeline.days);
+      if (data.updated_days) {
+        onTimelineUpdate(data.updated_days);
       }
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;

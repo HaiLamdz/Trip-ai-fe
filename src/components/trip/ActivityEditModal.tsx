@@ -1,7 +1,100 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
+
+/* ─── Nominatim autocomplete ──────────────────────────────────────── */
+interface NominatimResult { display_name: string; lat: string; lon: string; }
+
+function PlaceAutocomplete({
+  value,
+  onChange,
+  onSelect,
+  placeholder,
+  hasError,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSelect: (name: string) => void;
+  placeholder?: string;
+  hasError?: boolean;
+}) {
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleChange = (v: string) => {
+    onChange(v);
+    if (debounce.current) clearTimeout(debounce.current);
+    if (v.length < 2) { setSuggestions([]); setShow(false); return; }
+    debounce.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(v)}&format=json&limit=5`,
+          { headers: { 'Accept-Language': 'vi' } },
+        );
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+        setShow(data.length > 0);
+      } catch { /* ignore */ } finally {
+        setLoading(false);
+      }
+    }, 300);
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 15, pointerEvents: 'none' }}>📍</span>
+        <input
+          autoFocus
+          value={value}
+          onChange={e => handleChange(e.target.value)}
+          onBlur={() => setTimeout(() => setShow(false), 200)}
+          onFocus={() => { if (suggestions.length > 0) setShow(true); }}
+          autoComplete="off"
+          placeholder={placeholder ?? 'Nhập tên địa điểm...'}
+          style={{
+            ...inputStyle,
+            paddingLeft: 36,
+            fontSize: 15,
+            borderColor: hasError ? D.error : D.border2,
+          }}
+        />
+        {loading && (
+          <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>
+            <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.15)', borderTopColor: D.accent, borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          </span>
+        )}
+      </div>
+
+      {show && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', zIndex: 50, width: '100%', background: '#161b22',
+          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, marginTop: 4,
+          maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        }}>
+          {suggestions.map((s, i) => (
+            <button
+              key={i} type="button"
+              onMouseDown={e => { e.preventDefault(); onSelect(s.display_name); setShow(false); setSuggestions([]); }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '10px 14px', fontSize: 13, color: '#e6edf3',
+                background: 'none', border: 'none', cursor: 'pointer',
+                borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+              }}
+            >
+              📍 {s.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface ActivityFormData {
   time: string;
@@ -67,7 +160,7 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.time) e.time = 'Bắt buộc';
-    if (!form.title.trim()) e.title = 'Bắt buộc';
+    if (!form.place_name.trim()) e.place_name = 'Bắt buộc';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -77,7 +170,14 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
     if (!validate()) return;
     setSaving(true);
     try {
-      const payload = { ...form };
+      // Khi thêm mới: chỉ gửi place_name + time + place_type, backend tự geocode & dùng place_name làm title
+      // Khi sửa: gửi toàn bộ form để giữ nguyên các trường đã có
+      const payload = isEdit ? { ...form } : {
+        time:       form.time,
+        place_name: form.place_name.trim(),
+        place_type: form.place_type,
+      };
+
       let res;
       if (isEdit) {
         res = await api.put(`/trips/${tripId}/days/${dayId}/places/${placeId}`, payload);
@@ -92,6 +192,99 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
     }
   };
 
+  // ─── Chế độ thêm mới: form tối giản ──────────────────────────────
+  if (!isEdit) {
+    return (
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+        onClick={onClose}
+      >
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)' }} />
+        <div
+          style={{ position: 'relative', background: D.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 'env(safe-area-inset-bottom, 20px)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Handle bar */}
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.12)' }} />
+          </div>
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: D.text, margin: 0 }}>➕ Thêm địa điểm</h2>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4 }}>✕</button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Tên địa điểm */}
+              <div>
+                <label style={labelStyle}>Tên địa điểm *</label>
+                <PlaceAutocomplete
+                  value={form.place_name}
+                  onChange={v => set('place_name', v)}
+                  onSelect={v => set('place_name', v)}
+                  placeholder="VD: Phở Bát Đàn, Hồ Hoàn Kiếm..."
+                  hasError={!!errors.place_name}
+                />
+                {errors.place_name && <p style={errStyle}>{errors.place_name}</p>}
+                <p style={{ fontSize: 11, color: D.textMuted, marginTop: 4 }}>
+                  Nhập đủ tên để bản đồ tự định vị chính xác hơn
+                </p>
+              </div>
+
+              {/* Giờ đến */}
+              <div>
+                <label style={labelStyle}>Giờ đến *</label>
+                <input
+                  type="time"
+                  value={form.time}
+                  onChange={e => set('time', e.target.value)}
+                  style={{ ...inputStyle, colorScheme: 'dark', borderColor: errors.time ? D.error : D.border2 }}
+                />
+                {errors.time && <p style={errStyle}>{errors.time}</p>}
+              </div>
+
+              {/* Loại địa điểm */}
+              <div>
+                <label style={labelStyle}>Loại</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                  {PLACE_TYPES.map(t => (
+                    <button
+                      key={t.value} type="button"
+                      onClick={() => set('place_type', t.value)}
+                      style={{
+                        padding: '10px 4px', borderRadius: 12,
+                        border: form.place_type === t.value ? `1.5px solid ${D.accent}` : `1px solid ${D.border}`,
+                        background: form.place_type === t.value ? 'rgba(79,110,247,0.12)' : D.surface2,
+                        color: form.place_type === t.value ? '#818cf8' : D.textMuted,
+                        cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>{t.label.split(' ')[0]}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600 }}>{t.label.slice(t.label.indexOf(' ') + 1)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {errors._ && <p style={{ ...errStyle, textAlign: 'center' }}>{errors._}</p>}
+
+              <button
+                type="submit" disabled={saving}
+                style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: saving ? 'rgba(79,110,247,0.4)' : D.accent, color: '#fff', fontSize: 15, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', marginTop: 4 }}
+              >
+                {saving ? 'Đang thêm…' : 'Thêm vào lịch trình'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Chế độ chỉnh sửa: form đầy đủ (giữ nguyên cho power user) ───
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
@@ -101,13 +294,10 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${D.border}` }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: D.text, margin: 0 }}>
-            {isEdit ? '✏️ Chỉnh sửa hoạt động' : '➕ Thêm hoạt động'}
-          </h2>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: D.text, margin: 0 }}>✏️ Chỉnh sửa hoạt động</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>✕</button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '70vh', overflowY: 'auto' }}>
 
@@ -138,10 +328,13 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
 
             {/* Place name */}
             <div>
-              <label style={labelStyle}>Tên địa điểm (để search Google Maps)</label>
-              <input value={form.place_name} onChange={e => set('place_name', e.target.value)}
-                placeholder="VD: Phở Bát Đàn, 49 Bát Đàn, Hoàn Kiếm, Hà Nội"
-                style={inputStyle} />
+              <label style={labelStyle}>Tên địa điểm</label>
+              <PlaceAutocomplete
+                value={form.place_name}
+                onChange={v => set('place_name', v)}
+                onSelect={v => set('place_name', v)}
+                placeholder="VD: Phở Bát Đàn, 49 Bát Đàn, Hoàn Kiếm"
+              />
             </div>
 
             {/* Description */}
@@ -166,37 +359,6 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
               </div>
             </div>
 
-            {/* Row: transport + distance */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Di chuyển đến điểm tiếp theo</label>
-                <input value={form.transport_to_next} onChange={e => set('transport_to_next', e.target.value)}
-                  placeholder="VD: Đi bộ, Grab xe máy..."
-                  style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Khoảng cách (km)</label>
-                <input type="number" min={0} step={0.1} value={form.distance_to_next_km}
-                  onChange={e => set('distance_to_next_km', +e.target.value)} style={inputStyle} />
-              </div>
-            </div>
-
-            {/* Row: lat + lng */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Vĩ độ (latitude)</label>
-                <input type="number" step="any" value={form.latitude ?? ''}
-                  onChange={e => set('latitude', e.target.value ? +e.target.value : null)}
-                  placeholder="VD: 21.0285" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Kinh độ (longitude)</label>
-                <input type="number" step="any" value={form.longitude ?? ''}
-                  onChange={e => set('longitude', e.target.value ? +e.target.value : null)}
-                  placeholder="VD: 105.8542" style={inputStyle} />
-              </div>
-            </div>
-
             {errors._ && <p style={{ ...errStyle, textAlign: 'center' }}>{errors._}</p>}
           </div>
 
@@ -208,7 +370,7 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
             </button>
             <button type="submit" disabled={saving}
               style={{ flex: 2, padding: '10px', borderRadius: 10, background: saving ? 'rgba(79,110,247,0.5)' : D.accent, border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? 'Đang lưu…' : isEdit ? 'Lưu thay đổi' : 'Thêm hoạt động'}
+              {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
             </button>
           </div>
         </form>

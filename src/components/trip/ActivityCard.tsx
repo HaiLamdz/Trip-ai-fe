@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { formatCurrency } from '@/lib/utils';
 import NearbyPlaces from './NearbyPlaces';
 import ActivityEditModal, { ActivityFormData } from './ActivityEditModal';
+import CheckinModal, { CheckinData } from './CheckinModal';
 import { useUnsplashImage } from '@/hooks/useUnsplashImage';
 
 interface Activity {
@@ -15,6 +16,11 @@ interface Activity {
   transport_to_next: string | null; distance_to_next_km: number;
   latitude: number | null; longitude: number | null;
   sort_order: number;
+  // Check-in fields
+  checked_in_at?: string | null;
+  checkin_photo_url?: string | null;
+  checkin_note?: string | null;
+  actual_time?: string | null;
 }
 
 interface Props {
@@ -54,8 +60,10 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [checkinOpen, setCheckinOpen] = useState(false);
   const { url: imgUrl, fallbackColor, loading: imgLoading } = useUnsplashImage(activity.place_type, activity.title);
 
+  const isCheckedIn = !!activity.checked_in_at;
   const typeColor = TYPE_COLORS[activity.place_type] || '#94a3b8';
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place_name)}`;
 
@@ -106,8 +114,20 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
             borderRadius: 8, padding: '3px 10px',
             letterSpacing: 0.3, flexShrink: 0,
           }}>
-            {activity.time}
+            {activity.actual_time
+              ? <><span style={{ textDecoration: 'line-through', opacity: 0.4, marginRight: 4 }}>{activity.time}</span>{activity.actual_time}</>
+              : activity.time}
           </span>
+
+          {/* Check-in badge */}
+          {isCheckedIn && (
+            <span style={{
+              fontSize: 11, fontWeight: 600,
+              background: 'rgba(52,211,153,0.15)', color: '#34d399',
+              border: '1px solid rgba(52,211,153,0.3)',
+              borderRadius: 8, padding: '3px 8px', flexShrink: 0,
+            }}>✓ Đã đến</span>
+          )}
 
           {/* Place name — main label, clickable → Google Maps */}
           {activity.place_name && (
@@ -182,6 +202,22 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
               </h3>
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                {/* Check-in */}
+                {activity.id && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setCheckinOpen(true); }}
+                    title={isCheckedIn ? 'Xem / cập nhật check-in' : 'Check-in địa điểm này'}
+                    style={{
+                      background: isCheckedIn ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${isCheckedIn ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 6, cursor: 'pointer',
+                      color: isCheckedIn ? '#34d399' : 'rgba(255,255,255,0.5)',
+                      padding: '2px 7px', fontSize: 11, lineHeight: 1.6,
+                    }}
+                  >
+                    {isCheckedIn ? '📍 ✓' : '📍'}
+                  </button>
+                )}
                 <button
                   onClick={e => { e.stopPropagation(); onSave(activity); setSaved(true); setTimeout(() => setSaved(false), 2000); }}
                   title="Lưu địa điểm"
@@ -235,6 +271,13 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
                 </button>
               )}
             </div>
+
+            {/* Check-in note (if exists) */}
+            {activity.checkin_note && (
+              <div style={{ marginTop: 8, padding: '7px 10px', background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: 8, fontSize: 12, color: 'rgba(52,211,153,0.85)', lineHeight: 1.5 }}>
+                💬 {activity.checkin_note}
+              </div>
+            )}
           </div>
         </div>
 
@@ -270,6 +313,35 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
           initial={{ ...activity, transport_to_next: activity.transport_to_next ?? '' }}
           onSaved={updated => { setEditOpen(false); onUpdated(updated as Activity); }}
           onClose={() => setEditOpen(false)}
+        />
+      )}
+
+      {/* Check-in modal */}
+      {checkinOpen && activity.id && (
+        <CheckinModal
+          tripId={tripId}
+          place={{
+            id: activity.id,
+            title: activity.title,
+            place_name: activity.place_name,
+            place_type: activity.place_type,
+            time: activity.time,
+            checked_in_at: activity.checked_in_at,
+            checkin_photo_url: activity.checkin_photo_url,
+            checkin_note: activity.checkin_note,
+            actual_time: activity.actual_time,
+          }}
+          onSaved={(updated: CheckinData) => {
+            setCheckinOpen(false);
+            onUpdated({
+              ...activity,
+              checked_in_at: updated.checked_in_at,
+              checkin_photo_url: updated.checkin_photo_url,
+              checkin_note: updated.checkin_note,
+              actual_time: updated.actual_time,
+            } as Activity);
+          }}
+          onClose={() => setCheckinOpen(false)}
         />
       )}
 

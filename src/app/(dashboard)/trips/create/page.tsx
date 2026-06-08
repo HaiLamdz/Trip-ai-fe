@@ -174,16 +174,18 @@ export default function CreateTripPage() {
         preferences:        form.preferences.length ? form.preferences : undefined,
         notes:              form.notes || undefined,
       };
-      const { data } = await api.post('/trips', payload);
+      // Dùng timeout 60s riêng cho request tạo trip (backend có thể cold start trên Render)
+      const { data } = await api.post('/trips', payload, { timeout: 60000 });
       // Redirect ngay sang trang detail — trang đó sẽ tự poll status và hiện loading
       router.push(`/trips/${data.trip_id}`);
     } catch (err: unknown) {
       console.error('[CreateTrip] submit error:', err);
       const apiErr = err as { response?: { status?: number; data?: { errors?: Record<string, string[]>; message?: string } }; code?: string; message?: string };
-      
-      // Timeout
-      if (apiErr.code === 'ECONNABORTED' || apiErr.message?.includes('timeout')) {
-        setErrors({ _global: 'Kết nối quá chậm. Vui lòng thử lại.' });
+
+      // Timeout hoặc network error — request có thể đã gửi thành công
+      // Kiểm tra xem có trip_id không trước khi báo lỗi
+      if (apiErr.code === 'ECONNABORTED' || apiErr.code === 'ERR_NETWORK' || apiErr.message?.includes('timeout')) {
+        setErrors({ _global: 'Server đang khởi động, vui lòng thử lại sau vài giây.' });
         return;
       }
 
@@ -223,11 +225,11 @@ export default function CreateTripPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: D.bg, color: D.text, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '36px 24px 60px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: 'clamp(16px, 4vw, 36px) clamp(16px, 4vw, 24px) 60px' }}>
 
         {/* Page header */}
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 36, fontWeight: 800, color: D.text, letterSpacing: '-1.5px', margin: '0 0 6px' }}>
+        <div className="create-header" style={{ marginBottom: 32 }}>
+          <h1 style={{ fontWeight: 800, color: D.text, letterSpacing: '-1.5px', margin: '0 0 6px' }}>
             Đi đâu tiếp theo?
           </h1>
           <p style={{ fontSize: 15, color: D.textMuted, margin: 0 }}>
@@ -241,7 +243,7 @@ export default function CreateTripPage() {
               ⚠️ {errors._global}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 24, alignItems: 'start' }}>
+          <div className="create-layout">
 
             {/* ── LEFT COLUMN ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -307,7 +309,7 @@ export default function CreateTripPage() {
               {/* ─── Step 2 — Dates ─── */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, padding: '24px 24px 20px' }}>
                 <SectionHeader step={2} title="Khi nào bạn đi?" />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="create-dates-grid">
                   {/* Start date */}
                   <div>
                     <label style={labelStyle}>Ngày khởi hành</label>
@@ -350,7 +352,7 @@ export default function CreateTripPage() {
                   sub="AI dùng thông tin này làm điểm xuất phát mỗi ngày để tính lộ trình tối ưu" />
 
                 <label style={labelStyle}>Loại chỗ ở</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+                <div className="create-accom-grid">
                   {ACCOMMODATION_TYPES.map(a => {
                     const active = form.accommodation_type === a.value;
                     return (
@@ -364,7 +366,7 @@ export default function CreateTripPage() {
                   })}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
+                <div className="create-accom-bottom">
                   <div>
                     <label style={labelStyle}>
                       Khu vực / tên chỗ ở <Opt />
@@ -405,7 +407,7 @@ export default function CreateTripPage() {
                 {/* Travel type */}
                 <div style={{ marginBottom: 18 }}>
                   <label style={labelStyle}>Loại chuyến đi <Opt /></label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                  <div className="create-travel-type">
                     {TRAVEL_TYPES.map(t => {
                       const active = form.travel_type === t.value;
                       return (
@@ -426,7 +428,8 @@ export default function CreateTripPage() {
                 </div>
 
                 {/* Số hành khách — chỉ hiện khi family/group hoặc chưa chọn */}
-                <div style={{ display: 'grid', gridTemplateColumns: (form.travel_type === 'solo' || form.travel_type === 'couple') ? '1fr' : '1fr 1fr', gap: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: (form.travel_type === 'solo' || form.travel_type === 'couple') ? '1fr' : '1fr 1fr', gap: 24 }}
+                  className={`create-budget-row ${(form.travel_type === '' || form.travel_type === 'family' || form.travel_type === 'group') ? 'has-people' : 'no-people'}`}>
                   {(form.travel_type === '' || form.travel_type === 'family' || form.travel_type === 'group') && (
                     <div>
                       <label style={labelStyle}>Số hành khách</label>
@@ -546,7 +549,7 @@ export default function CreateTripPage() {
 
 
             {/* ── RIGHT COLUMN — Preview Panel ── */}
-            <div style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="create-preview">
 
               {/* Map preview */}
               <div style={{ background: D.surface, border: `1px solid ${D.border}`, borderRadius: 16, overflow: 'hidden' }}>
@@ -667,6 +670,93 @@ export default function CreateTripPage() {
         input[type=time]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
         input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
         input[type=range] { height: 4px; }
+
+        /* ── Responsive ── */
+        .create-layout {
+          display: grid;
+          grid-template-columns: 1fr 380px;
+          gap: 24px;
+          align-items: start;
+        }
+        .create-preview {
+          position: sticky;
+          top: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .create-header {
+          margin-bottom: 32px;
+        }
+        .create-header h1 {
+          font-size: 36px;
+        }
+        .create-dates-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .create-accom-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .create-accom-bottom {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+          align-items: end;
+        }
+        .create-travel-type {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+        }
+        .create-budget-row {
+          display: grid;
+          gap: 24px;
+        }
+        .create-budget-row.has-people {
+          grid-template-columns: 1fr 1fr;
+        }
+        .create-budget-row.no-people {
+          grid-template-columns: 1fr;
+        }
+
+        @media (max-width: 768px) {
+          .create-layout {
+            grid-template-columns: 1fr !important;
+          }
+          .create-preview {
+            position: static !important;
+            order: -1;
+          }
+          .create-header h1 {
+            font-size: 26px !important;
+          }
+          .create-dates-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .create-accom-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .create-accom-bottom {
+            grid-template-columns: 1fr !important;
+          }
+          .create-travel-type {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .create-budget-row.has-people {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .create-dates-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
     </div>
   );

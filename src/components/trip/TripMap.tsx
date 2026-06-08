@@ -17,6 +17,10 @@ interface Place {
   duration_minutes?: number;
   transport_to_next?: string | null;
   distance_to_next_km?: number;
+  // check-in
+  checked_in_at?: string | null;
+  checkin_photo_url?: string | null;
+  checkin_note?: string | null;
 }
 
 interface TripDay {
@@ -166,6 +170,59 @@ export default function TripMap({ places, days, activePlace, activeDayNumber, on
 
           const key = `${place.latitude},${place.longitude},${place.title}`;
           markersRef.current.set(key, marker);
+
+          // ── Check-in photo overlay marker ──
+          if (place.checked_in_at && place.checkin_photo_url) {
+            const checkinIcon = L.divIcon({
+              html: `
+                <div style="
+                  position:relative;
+                  width:52px; height:52px;
+                ">
+                  <div style="
+                    width:48px; height:48px;
+                    border-radius:50%;
+                    overflow:hidden;
+                    border:3px solid #34d399;
+                    box-shadow:0 2px 12px rgba(0,0,0,0.45);
+                    background:#1c2128;
+                  ">
+                    <img
+                      src="${place.checkin_photo_url}"
+                      style="width:100%;height:100%;object-fit:cover"
+                      onerror="this.style.display='none'"
+                    />
+                  </div>
+                  <div style="
+                    position:absolute;bottom:-2px;right:-2px;
+                    width:18px;height:18px;
+                    border-radius:50%;
+                    background:#34d399;
+                    border:2px solid #0d1117;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:9px;line-height:1;
+                  ">✓</div>
+                </div>
+              `,
+              className: '',
+              iconSize: [52, 52],
+              iconAnchor: [26, 52],
+              popupAnchor: [0, -54],
+            });
+
+            const checkinNote = place.checkin_note ? `<div style="font-size:11px;color:#34d399;margin-top:6px;font-style:italic">"${place.checkin_note}"</div>` : '';
+
+            L.marker([place.latitude, place.longitude], { icon: checkinIcon, zIndexOffset: 500 })
+              .addTo(map)
+              .bindPopup(`
+                <div style="min-width:200px;font-family:system-ui,sans-serif">
+                  <img src="${place.checkin_photo_url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" />
+                  <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">📍 ${place.title}</div>
+                  <div style="font-size:11px;color:#555">${place.place_name}</div>
+                  ${checkinNote}
+                </div>
+              `, { maxWidth: 220 });
+          }
         });
       });
 
