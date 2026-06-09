@@ -461,7 +461,7 @@ export default function DashboardPage() {
             <div style={{ background: '#fff', border: '1.5px solid rgba(37,99,235,0.1)', borderRadius: 20, padding: '48px 24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
               <div style={{ fontSize: 52, marginBottom: 16 }}>✈️</div>
               <h3 style={{ fontSize: 18, fontWeight: 800, color: D.text, marginBottom: 8 }}>Bắt Đầu Hành Trình Của Bạn</h3>
-              <p style={{ fontSize: 13, color: D.textMuted, marginBottom: 24, lineHeight: 1.6 }}>Để AI lên kế hoạch chuyến đi hoàn hảo cho bạn.</p>
+              <p style={{ fontSize: 13, color: D.textMuted, marginBottom: 24, lineHeight: 1.6 }}>Để Trip AI lên kế hoạch chuyến đi hoàn hảo cho bạn.</p>
               <Link href="/trips/create" style={{ display: 'inline-block', padding: '12px 32px', borderRadius: 99, background: D.accent, color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 16px rgba(37,99,235,0.3)' }}>
                 Tạo Chuyến Đi Đầu Tiên
               </Link>
@@ -496,7 +496,7 @@ export default function DashboardPage() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill={D.accent}>
                 <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/>
               </svg>
-              <span style={{ fontSize: 18, fontWeight: 800, color: D.text, letterSpacing: '-0.3px' }}>Gợi Ý AI</span>
+              <span style={{ fontSize: 18, fontWeight: 800, color: D.text, letterSpacing: '-0.3px' }}>Gợi Ý Trip AI</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
@@ -594,7 +594,7 @@ export default function DashboardPage() {
             Xin chào, {user?.name?.split(' ').pop() || 'bạn'}. Hôm nay đi đâu?
           </h1>
           <p style={{ fontSize: 15, color: D.textMuted, margin: 0 }}>
-            Lịch trình AI cá nhân hóa của bạn đã sẵn sàng.{' '}
+            Lịch trình Trip AI cá nhân hóa của bạn đã sẵn sàng.{' '}
             {activePlans.length > 0 && `Bạn có ${activePlans.length} chuyến đi sắp tới.`}
           </p>
         </div>
@@ -625,9 +625,9 @@ export default function DashboardPage() {
         ) : trips.length === 0 ? (
           <div style={{ background: '#fff', border: '1.5px solid rgba(0,0,0,0.07)', borderRadius: 16, padding: '48px 32px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ fontSize: 36, marginBottom: 16 }}>✦✦</div>
-            <h3 style={{ fontSize: 20, fontWeight: 700, color: D.text, marginBottom: 8 }}>Bắt đầu hành trình AI tiếp theo</h3>
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: D.text, marginBottom: 8 }}>Bắt đầu hành trình Trip AI tiếp theo</h3>
             <p style={{ fontSize: 14, color: D.textMuted, marginBottom: 24, maxWidth: 360, margin: '0 auto 24px', lineHeight: 1.6 }}>
-              Chưa có ý tưởng? Để AI phân tích sở thích và đề xuất lịch trình phù hợp.
+              Chưa có ý tưởng? Để Trip AI phân tích sở thích và đề xuất lịch trình phù hợp.
             </p>
             <Link href="/trips/create" style={{ padding: '10px 24px', borderRadius: 10, background: D.accent, color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
               Bắt đầu ngay

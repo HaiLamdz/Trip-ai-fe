@@ -3,7 +3,7 @@ import Link from 'next/link';
 const FEATURES = [
   {
     icon: '✦',
-    title: 'Lịch trình AI',
+    title: 'Lịch trình Trip AI',
     desc: 'Tạo kế hoạch từng bước siêu cá nhân hóa, thích nghi với nhịp độ, sở thích và thay đổi thời tiết thực tế của bạn.',
     link: 'Tìm hiểu thêm',
   },
@@ -55,7 +55,7 @@ export default function LandingPage() {
         <div style={{ position: 'relative', maxWidth: 700, margin: '0 auto', padding: '0 24px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(79,110,247,0.12)', border: '1px solid rgba(79,110,247,0.3)', borderRadius: 100, padding: '5px 14px', marginBottom: 28 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4f6ef7', display: 'inline-block' }} />
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Được hỗ trợ bởi Gemini AI</span>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Được hỗ trợ bởi Trip AI</span>
           </div>
 
           <h1 style={{ fontSize: 'clamp(40px, 6vw, 68px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-2px', marginBottom: 24, color: '#fff' }}>
@@ -63,7 +63,7 @@ export default function LandingPage() {
           </h1>
 
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, marginBottom: 40, maxWidth: 480, margin: '0 auto 40px' }}>
-            Lên kế hoạch chuyến đi hoàn hảo trong vài giây, không phải vài giờ. Được hỗ trợ bởi Gemini AI và dữ liệu du lịch thời gian thực để mang đến lịch trình được cá nhân hóa cho bạn.
+            Lên kế hoạch chuyến đi hoàn hảo trong vài giây, không phải vài giờ. Được hỗ trợ bởi Trip AI và dữ liệu du lịch thời gian thực để mang đến lịch trình được cá nhân hóa cho bạn.
           </p>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -120,7 +120,7 @@ export default function LandingPage() {
 
               {/* AI suggestion chip */}
               <div style={{ position: 'absolute', bottom: 20, right: 20, background: 'rgba(79,110,247,0.9)', backdropFilter: 'blur(8px)', borderRadius: 10, padding: '8px 14px', fontSize: 12, color: '#fff', fontWeight: 500 }}>
-                ✦ Gợi ý AI: Shibuya từ đây
+                ✦ Gợi ý từ Trip AI: Shibuya từ đây
               </div>
             </div>
 
@@ -147,7 +147,7 @@ export default function LandingPage() {
             Thiết kế cho thập kỷ tiếp theo
           </h2>
           <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.45)', maxWidth: 420, margin: '0 auto' }}>
-            Bỏ qua bảng tính. AI của chúng tôi xử lý mọi logistics trong khi bạn tập trung vào những kỷ niệm.
+            Bỏ qua bảng tính. Trip AI xử lý mọi logistics trong khi bạn tập trung vào những kỷ niệm.
           </p>
         </div>
 

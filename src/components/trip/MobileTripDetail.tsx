@@ -470,7 +470,7 @@ function PlanActivityRow({
                     </a>
                   )}
                   {isNext && activity.transport_to_next && (
-                    <span style={{ fontStyle: 'italic' }}>🚶 AI gợi ý: {activity.transport_to_next}</span>
+                    <span style={{ fontStyle: 'italic' }}>🚶 Trip AI gợi ý: {activity.transport_to_next}</span>
                   )}
                 </div>
 
@@ -1283,14 +1283,14 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
             {packingLoading && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '40px 0', color: '#64748b', fontSize: 13 }}>
                 <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0', borderTopColor: '#4f6ef7', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                AI đang tạo danh sách…
+                Trip AI đang tạo danh sách…
               </div>
             )}
 
             {!packingLoading && !packingLoaded && (
               <button onClick={loadPacking}
                 style={{ width: '100%', padding: '13px', borderRadius: 14, border: '1px dashed rgba(79,110,247,0.35)', background: 'rgba(79,110,247,0.06)', color: '#4f6ef7', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                ✨ Tạo danh sách bằng AI
+                ✨ Tạo danh sách bằng Trip AI
               </button>
             )}
 
@@ -1363,7 +1363,7 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
               {chatMessages.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '28px 0', color: '#94a3b8' }}>
                   <div style={{ fontSize: 30, marginBottom: 10 }}>✦</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>Hỏi AI để chỉnh sửa lịch trình</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>Hỏi Trip AI để chỉnh sửa lịch trình</div>
                   <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, lineHeight: 1.7 }}>Ví dụ: &quot;Thêm quán cafe buổi sáng&quot;<br />&quot;Giảm chi phí ngày 2&quot;</div>
                 </div>
               )}

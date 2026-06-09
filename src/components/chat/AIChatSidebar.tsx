@@ -71,7 +71,7 @@ export default function AIChatSidebar({ tripId, onClose, onTimelineUpdate }: Pro
         {messages.length === 0 && (
           <div className="text-center text-gray-500 text-sm mt-8">
             <p className="text-3xl mb-3">💬</p>
-            <p>Hỏi AI để chỉnh sửa lịch trình</p>
+            <p>Hỏi Trip AI để chỉnh sửa lịch trình</p>
             <p className="text-xs mt-2 text-gray-400">Ví dụ: "Thêm quán cafe buổi sáng", "Giảm chi phí ngày 2"</p>
           </div>
         )}
@@ -89,7 +89,7 @@ export default function AIChatSidebar({ tripId, onClose, onTimelineUpdate }: Pro
         {loading && (
           <div className="flex justify-start">
             <div className="bg-gray-100 px-3 py-2 rounded-2xl rounded-bl-sm text-sm text-gray-500">
-              <span className="animate-pulse">AI đang suy nghĩ...</span>
+              <span className="animate-pulse">Trip AI đang suy nghĩ...</span>
             </div>
           </div>
         )}

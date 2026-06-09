@@ -233,7 +233,7 @@ export default function CreateTripPage() {
             Đi đâu tiếp theo?
           </h1>
           <p style={{ fontSize: 15, color: D.textMuted, margin: 0 }}>
-            AI của chúng tôi sẽ kiến tạo hành trình hoàn hảo cho bạn trong vài giây.
+            Trip AI sẽ kiến tạo hành trình hoàn hảo cho bạn trong vài giây.
           </p>
         </div>
 
@@ -293,7 +293,7 @@ export default function CreateTripPage() {
                     onChange={e => handleOriginChange(e.target.value)}
                     onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
                     autoComplete="off"
-                    placeholder="Bạn đang ở đâu? (để AI ước tính chi phí di chuyển)"
+                    placeholder="Bạn đang ở đâu? (để Trip AI ước tính chi phí di chuyển)"
                     style={inputStyle(false, true)}
                   />
                   {showOriginSuggestions && originSuggestions.length > 0 && (
@@ -349,7 +349,7 @@ export default function CreateTripPage() {
               {/* ─── Step 3 — Accommodation ─── */}
               <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={3} title="Chỗ ở & Giờ đến"
-                  sub="AI dùng thông tin này làm điểm xuất phát mỗi ngày để tính lộ trình tối ưu" />
+                  sub="Trip AI dùng thông tin này làm điểm xuất phát mỗi ngày để tính lộ trình tối ưu" />
 
                 <label style={labelStyle}>Loại chỗ ở</label>
                 <div className="create-accom-grid">
@@ -494,13 +494,21 @@ export default function CreateTripPage() {
               <div style={{ background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 16, padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <SectionHeader step={5} title="Sở thích & Phong cách" />
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10, marginBottom: 18 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
                   {PREFERENCES.map(p => {
                     const active = form.preferences.includes(p.value);
                     return (
                       <button key={p.value} type="button" onClick={() => togglePref(p.value)}
-                        style={{ padding: '14px 8px', borderRadius: 12, border: `1px solid ${active ? D.accent : D.border2}`, background: active ? D.accentBg : D.surface2, color: active ? '#4f6ef7' : D.textMuted, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: active ? 600 : 400, transition: 'all 0.15s' }}>
-                        <span style={{ fontSize: 22 }}>{p.label.split(' ')[0]}</span>
+                        style={{
+                          padding: '8px 16px', borderRadius: 99, fontSize: 13,
+                          fontWeight: active ? 600 : 400, cursor: 'pointer',
+                          border: `1px solid ${active ? D.accent : D.border2}`,
+                          background: active ? D.accentBg : D.surface2,
+                          color: active ? D.accent : D.textMuted,
+                          transition: 'all 0.15s',
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                        }}>
+                        <span style={{ fontSize: 15 }}>{p.label.split(' ')[0]}</span>
                         <span>{p.label.split(' ').slice(1).join(' ') || p.label}</span>
                       </button>
                     );
@@ -508,13 +516,13 @@ export default function CreateTripPage() {
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Ghi chú thêm cho AI <Opt /></label>
+                  <label style={labelStyle}>Ghi chú thêm cho Trip AI <Opt /></label>
                   <textarea rows={3} maxLength={1000} value={form.notes}
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="Mô tả yêu cầu đặc biệt, hạn chế ăn uống, mong muốn cụ thể..."
                     style={{ width: '100%', boxSizing: 'border-box', resize: 'none', background: '#f8fafc', border: `1px solid #e2e8f0`, borderRadius: 10, padding: '10px 13px', fontSize: 13, color: '#1e293b', outline: 'none', lineHeight: 1.6 }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
                       {['✨ Chill vibes', '👨‍👩‍👧 Gia đình', '🎒 Phượt thủ'].map(tag => (
                         <button key={tag} type="button"
                           onClick={() => setForm(f => ({ ...f, notes: f.notes ? f.notes + ' ' + tag : tag }))}
@@ -538,7 +546,7 @@ export default function CreateTripPage() {
                       Đang gửi yêu cầu...
                     </>
                   ) : (
-                    <>✦ Tạo lịch trình với AI</>
+                    <>✦ Tạo lịch trình với Trip AI</>
                   )}
                 </button>
                 <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', marginTop: 10 }}>
@@ -618,7 +626,7 @@ export default function CreateTripPage() {
                       <div style={{ fontSize: 12, fontWeight: 600, color: D.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {form.accommodation_type
                           ? ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label
-                          : 'AI tự chọn chỗ ở'}
+                          : 'Trip AI tự chọn chỗ ở'}
                         {form.accommodation_area && <span style={{ color: D.textMuted, fontWeight: 400 }}> · {form.accommodation_area}</span>}
                       </div>
                     </div>
@@ -648,13 +656,13 @@ export default function CreateTripPage() {
               <div style={{ background: D.surface, border: '1px solid rgba(79,110,247,0.3)', borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: D.accentBg, border: `1px solid ${D.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>✦</div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#4f6ef7', marginBottom: 4 }}>Gợi ý AI</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#4f6ef7', marginBottom: 4 }}>Gợi ý từ Trip AI</div>
                   <p style={{ fontSize: 12, color: D.textMuted, margin: 0, lineHeight: 1.6 }}>
                     {form.destination && form.accommodation_type
-                      ? `AI sẽ chọn ${ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label} tại ${form.destination.split(',')[0]}${form.accommodation_area ? ` (${form.accommodation_area})` : ''} làm điểm gốc${form.origin ? `, tính chi phí từ ${form.origin.split(',')[0]}` : ''}.`
+                      ? `Trip AI sẽ chọn ${ACCOMMODATION_TYPES.find(a => a.value === form.accommodation_type)?.label} tại ${form.destination.split(',')[0]}${form.accommodation_area ? ` (${form.accommodation_area})` : ''} làm điểm gốc${form.origin ? `, tính chi phí từ ${form.origin.split(',')[0]}` : ''}.`
                       : form.destination
-                      ? 'Chọn loại chỗ ở để AI tính lộ trình tối ưu từ điểm xuất phát mỗi ngày.'
-                      : 'Nhập điểm đến và AI sẽ phân tích thời tiết, chọn chỗ ở phù hợp, rồi tối ưu lộ trình từng ngày.'}
+                      ? 'Chọn loại chỗ ở để Trip AI tính lộ trình tối ưu từ điểm xuất phát mỗi ngày.'
+                      : 'Nhập điểm đến và Trip AI sẽ phân tích thời tiết, chọn chỗ ở phù hợp, rồi tối ưu lộ trình từng ngày.'}
                   </p>
                 </div>
               </div>

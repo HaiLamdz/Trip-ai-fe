@@ -634,7 +634,7 @@ export default function TripDetailPage() {
                 })()}
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px' }}>
-                {packingLoading && <div style={{ textAlign: 'center', padding: '40px 0', color: D.textMuted }}>AI đang tạo danh sách…</div>}
+                {packingLoading && <div style={{ textAlign: 'center', padding: '40px 0', color: D.textMuted }}>Trip AI đang tạo danh sách…</div>}
                 {!packingLoading && packingData && packingData.categories.map((cat, ci) => (
                   <div key={ci} style={{ marginBottom: 20 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: D.text, marginBottom: 8 }}>{cat.emoji} {cat.name}</div>
@@ -703,7 +703,7 @@ export default function TripDetailPage() {
               {chatMessages.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '32px 16px', color: D.textMuted }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>✦</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, fontWeight: 500, color: D.text }}>Hỏi AI để chỉnh sửa lịch trình</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, fontWeight: 500, color: D.text }}>Hỏi Trip AI để chỉnh sửa lịch trình</div>
                   <div style={{ fontSize: 12, color: D.textDim, marginTop: 8, lineHeight: 1.6 }}>
                     Ví dụ: &quot;Thêm quán cafe buổi sáng&quot;,<br />&quot;Giảm chi phí ngày 2&quot;
                   </div>

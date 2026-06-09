@@ -85,7 +85,7 @@ export default function PackingList({ tripId, onClose }: Props) {
           {loading && (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
               <div className="w-8 h-8 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
-              <span className="text-sm">AI đang tạo danh sách…</span>
+              <span className="text-sm">Trip AI đang tạo danh sách…</span>
             </div>
           )}
 
