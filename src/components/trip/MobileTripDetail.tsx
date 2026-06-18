@@ -47,6 +47,7 @@ interface TripDetail {
   budget_data?: TripBudgetData | null;
   status: string; days: TripDay[];
   user_notes: string | null; preferences: string[];
+  cover_image_url?: string | null;
 }
 interface ChatMessage { role: 'user' | 'ai'; content: string; }
 
@@ -831,11 +832,13 @@ function ExpensesTab({ tripId, tripBudget }: { tripId: number; tripBudget: numbe
 }
 
 /* ─── Hero Banner ────────────────────────────────────────────────────── */
-function HeroBanner({ destination, startDate, durationDays, onBack, onShare, shareCopied }: {
+function HeroBanner({ destination, startDate, durationDays, coverImageUrl, onBack, onShare, shareCopied }: {
   destination: string; startDate: string; durationDays: number;
+  coverImageUrl?: string | null;
   onBack: () => void; onShare: () => void; shareCopied: boolean;
 }) {
-  const { url: heroImg, fallbackColor } = useUnsplashImage('attraction', destination);
+  const { url: unsplashImg, fallbackColor } = useUnsplashImage('attraction', destination);
+  const heroImg = coverImageUrl || unsplashImg;
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + durationDays - 1);
   const fmtRange = (s: string, e: Date) => {
@@ -1039,6 +1042,7 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
           destination={trip.destination}
           startDate={trip.start_date}
           durationDays={trip.duration_days}
+          coverImageUrl={trip.cover_image_url}
           onBack={onBack}
           onShare={handleShare}
           shareCopied={shareCopied}

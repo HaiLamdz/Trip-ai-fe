@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import api from '@/lib/api';
 import { useTripStatus } from '@/hooks/useTripStatus';
+import { useUnsplashImage } from '@/hooks/useUnsplashImage';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import ActivityCard from '@/components/trip/ActivityCard';
 import CostSplit from '@/components/trip/CostSplit';
@@ -55,6 +57,7 @@ interface TripDetail {
   num_people: number; status: string; days: TripDay[];
   user_notes: string | null;
   preferences: string[];
+  cover_image_url?: string | null;
 }
 interface PackingItem { name: string; quantity: string; essential: boolean; note?: string; }
 interface PackingCategory { name: string; emoji: string; items: PackingItem[]; }
@@ -74,6 +77,18 @@ const D = {
   text: '#e6edf3', textMuted: 'rgba(255,255,255,0.45)', textDim: 'rgba(255,255,255,0.25)',
   accent: '#4f6ef7', accentBg: 'rgba(79,110,247,0.12)',
 };
+
+/* ── Desktop cover thumbnail in header ── */
+function DesktopCoverThumb({ coverImageUrl, destination }: { coverImageUrl?: string | null; destination: string }) {
+  const { url: unsplashUrl } = useUnsplashImage('attraction', destination);
+  const imgUrl = coverImageUrl || unsplashUrl;
+  if (!imgUrl) return null;
+  return (
+    <div style={{ position: 'relative', width: 52, height: 36, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.1)' }}>
+      <Image src={imgUrl} alt={destination} fill sizes="52px" unoptimized style={{ objectFit: 'cover' }} />
+    </div>
+  );
+}
 
 export default function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -459,6 +474,7 @@ export default function TripDetailPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3 }}>
             <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: D.textMuted, cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}>←</button>
+            <DesktopCoverThumb coverImageUrl={trip.cover_image_url} destination={trip.destination} />
             <h1 style={{ fontSize: 19, fontWeight: 700, color: D.text, letterSpacing: '-0.4px', margin: 0 }}>{trip.destination}</h1>
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 13, color: D.textMuted, paddingLeft: 28 }}>

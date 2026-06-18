@@ -18,6 +18,7 @@ interface Trip {
   num_people?: number;
   status: 'draft' | 'processing' | 'completed' | 'failed';
   created_at: string;
+  cover_image_url?: string | null;
 }
 
 interface PaginatedTrips {
@@ -51,7 +52,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
    MOBILE: Hero card (current trip)
 ────────────────────────────────────────── */
 function MobileHeroCard({ trip }: { trip: Trip }) {
-  const { url: imgUrl } = useUnsplashImage('attraction', trip.destination);
+  const { url: unsplashUrl } = useUnsplashImage('attraction', trip.destination);
+  const imgUrl = trip.cover_image_url || unsplashUrl;
 
   const daysTo = Math.ceil(
     (new Date(trip.start_date).getTime() - Date.now()) / 86_400_000,
@@ -98,7 +100,8 @@ function MobileHeroCard({ trip }: { trip: Trip }) {
    MOBILE: Upcoming trip card (horizontal scroll)
 ────────────────────────────────────────── */
 function UpcomingTripCard({ trip }: { trip: Trip }) {
-  const { url: imgUrl } = useUnsplashImage('attraction', trip.destination);
+  const { url: unsplashUrl } = useUnsplashImage('attraction', trip.destination);
+  const imgUrl = trip.cover_image_url || unsplashUrl;
 
   const s = new Date(trip.start_date);
   const e = new Date(s);
@@ -130,7 +133,8 @@ function UpcomingTripCard({ trip }: { trip: Trip }) {
    MOBILE: Recent memory photo (3-grid)
 ────────────────────────────────────────── */
 function MemoryPhoto({ trip }: { trip: Trip }) {
-  const { url: imgUrl } = useUnsplashImage('attraction', trip.destination);
+  const { url: unsplashUrl } = useUnsplashImage('attraction', trip.destination);
+  const imgUrl = trip.cover_image_url || unsplashUrl;
   return (
     <Link href={`/trips/${trip.id}`} style={{ textDecoration: 'none', display: 'block', borderRadius: 12, overflow: 'hidden', position: 'relative', aspectRatio: '1', background: D.surface2 }}>
       {imgUrl && (
@@ -146,7 +150,8 @@ function MemoryPhoto({ trip }: { trip: Trip }) {
 function DesktopTripCard({ trip, onDelete, onDuplicate, large = false }: {
   trip: Trip; onDelete: (id: number) => void; onDuplicate: (id: number) => void; large?: boolean;
 }) {
-  const { url: imgUrl } = useUnsplashImage('attraction', trip.destination);
+  const { url: unsplashUrl } = useUnsplashImage('attraction', trip.destination);
+  const imgUrl = trip.cover_image_url || unsplashUrl;
   const status = STATUS_CONFIG[trip.status] ?? STATUS_CONFIG.draft;
   const [menuOpen, setMenuOpen] = useState(false);
 
