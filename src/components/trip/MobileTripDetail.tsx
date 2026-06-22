@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import { useUnsplashImage } from '@/hooks/useUnsplashImage';
 import api from '@/lib/api';
@@ -48,6 +49,7 @@ interface TripDetail {
   status: string; days: TripDay[];
   user_notes: string | null; preferences: string[];
   cover_image_url?: string | null;
+  is_published?: boolean;
 }
 interface ChatMessage { role: 'user' | 'ai'; content: string; }
 
@@ -666,10 +668,172 @@ function JournalTab({ tripId }: { tripId: number }) {
   );
 }
 
+/* ─── Members Tab ───────────────────────────────────────────────────── */
+function MembersTab({ tripId }: { tripId: number }) {
+  const [members, setMembers] = useState<{ id: number; name: string; email?: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/trips/${tripId}/members`).then(({ data }) => {
+      setMembers(data.members ?? []);
+    }).catch(() => setMembers([])).finally(() => setLoading(false));
+  }, [tripId]);
+
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+      <div style={{ width: 28, height: 28, border: '2px solid #e2e8f0', borderTopColor: '#4f6ef7', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  );
+
+  if (members.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b' }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>👥</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Chưa có thành viên</div>
+      <div style={{ fontSize: 14, lineHeight: 1.7 }}>Mời thành viên vào chuyến đi để cùng lập kế hoạch.</div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {members.map(m => (
+        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 44, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{m.name?.[0] ?? 'U'}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{m.name}</div>
+            {m.email && <div style={{ fontSize: 12, color: '#64748b' }}>{m.email}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── Expenses Tab ───────────────────────────────────────────────────── */
-function ExpensesTab({ tripId, tripBudget }: { tripId: number; tripBudget: number }) {
+const EXPENSE_TO_BUDGET: Record<string, string> = {
+  food: 'food', transport: 'transport', attraction: 'attraction',
+  accommodation: 'accommodation', shopping: 'other', other: 'other',
+};
+
+const BUDGET_CATEGORIES_CONFIG = [
+  { key: 'food',          label: 'Ẩm thực',   emoji: '🍜', color: '#f97316' },
+  { key: 'transport',     label: 'Di chuyển',  emoji: '🚗', color: '#6b7280' },
+  { key: 'attraction',    label: 'Tham quan',  emoji: '🏛️', color: '#3b82f6' },
+  { key: 'accommodation', label: 'Lưu trú',    emoji: '🏨', color: '#10b981' },
+  { key: 'other',         label: 'Khác',       emoji: '🛍️', color: '#a78bfa' },
+];
+
+function BudgetOverviewMobile({ expenses, budgetData, tripBudget, numPeople }: {
+  expenses: Expense[];
+  budgetData?: TripBudgetData | null;
+  tripBudget: number;
+  numPeople: number;
+}) {
+  const [open, setOpen] = useState(true);
+  const totalEstimated = Number(budgetData?.total_estimated) || tripBudget;
+  const totalPlanned   = tripBudget;
+  const totalActual    = expenses.reduce((s, e) => s + Number(e.amount), 0);
+
+  const actualByCategory: Record<string, number> = {};
+  for (const exp of expenses) {
+    const cat = EXPENSE_TO_BUDGET[exp.category] ?? 'other';
+    actualByCategory[cat] = (actualByCategory[cat] ?? 0) + Number(exp.amount);
+  }
+
+  const spentPct = totalEstimated > 0 ? Math.min(100, (totalActual / totalEstimated) * 100) : 0;
+  const isOverActual = totalActual > totalEstimated;
+  const isOverPlanned = totalEstimated > totalPlanned;
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 18, overflow: 'hidden', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+      <button onClick={() => setOpen(v => !v)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>💰 Ngân sách tổng quan</span>
+        <span style={{ fontSize: 16, color: '#94a3b8', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>⌃</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: '0 16px 16px', borderTop: '1px solid #f1f5f9' }}>
+          {/* 3 summary boxes */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12, marginBottom: 14 }}>
+            {[
+              { label: 'Kế hoạch', value: totalPlanned, sub: 'Bạn đặt ra', over: false },
+              { label: 'Dự kiến AI', value: totalEstimated, sub: isOverPlanned ? `+${formatCurrency(totalEstimated - totalPlanned)}` : `Tiết kiệm ${formatCurrency(totalPlanned - totalEstimated)}`, over: isOverPlanned },
+              { label: 'Đã chi', value: totalActual, sub: totalActual > 0 ? (isOverActual ? `Vượt ${formatCurrency(totalActual - totalEstimated)}` : `Còn ${formatCurrency(totalEstimated - totalActual)}`) : 'Chưa có', over: isOverActual },
+            ].map((box, i) => (
+              <div key={i} style={{ background: box.over ? 'rgba(239,68,68,0.05)' : '#f8fafc', border: box.over ? '1px solid rgba(239,68,68,0.2)' : 'none', borderRadius: 12, padding: '10px' }}>
+                <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 }}>{box.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: box.over ? '#ef4444' : i === 2 && box.value > 0 ? '#f59e0b' : i === 2 ? '#94a3b8' : '#1e293b' }}>
+                  {box.value > 0 ? formatCurrency(box.value) : '–'}
+                </div>
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, lineHeight: 1.3 }}>{box.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          {totalActual > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
+                <span style={{ color: '#94a3b8' }}>Đã chi {Math.round(spentPct)}%</span>
+                <span style={{ fontWeight: 600, color: isOverActual ? '#ef4444' : '#10b981' }}>{formatCurrency(totalActual)} / {formatCurrency(totalEstimated)}</span>
+              </div>
+              <div style={{ height: 7, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${spentPct}%`, borderRadius: 99, transition: 'width 0.5s', background: isOverActual ? 'linear-gradient(90deg,#f97316,#ef4444)' : spentPct > 75 ? 'linear-gradient(90deg,#10b981,#f59e0b)' : 'linear-gradient(90deg,#10b981,#4f6ef7)' }} />
+              </div>
+            </div>
+          )}
+
+          {/* Category bars */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {BUDGET_CATEGORIES_CONFIG.map(cat => {
+              const estimated = Number((budgetData as Record<string, string> | null)?.[cat.key] ?? 0);
+              const actual    = actualByCategory[cat.key] ?? 0;
+              if (estimated === 0 && actual === 0) return null;
+              const barPct = estimated > 0 ? Math.min(100, (actual / estimated) * 100) : 0;
+              const isOver = actual > estimated && estimated > 0;
+              return (
+                <div key={cat.key} style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                    <span style={{ fontSize: 13 }}>{cat.emoji}</span>
+                    <span style={{ flex: 1, fontSize: 12, color: '#1e293b', fontWeight: 600 }}>{cat.label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: isOver ? '#ef4444' : actual > 0 ? '#f59e0b' : '#64748b' }}>
+                      {actual > 0 ? formatCurrency(actual) : '–'}
+                      <span style={{ fontWeight: 400, color: '#94a3b8' }}> / {formatCurrency(estimated)}</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 3, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
+                    {actual > 0
+                      ? <div style={{ height: '100%', width: `${barPct}%`, background: isOver ? '#ef4444' : cat.color, borderRadius: 99, transition: 'width 0.4s' }} />
+                      : <div style={{ height: '100%', width: `${totalEstimated > 0 ? (estimated / totalEstimated) * 100 : 0}%`, background: `${cat.color}50`, borderRadius: 99 }} />
+                    }
+                  </div>
+                  {actual > 0 && <div style={{ fontSize: 10, marginTop: 3, color: isOver ? '#ef4444' : '#10b981' }}>{isOver ? `⚠ Vượt ${formatCurrency(actual - estimated)}` : `✓ Còn ${formatCurrency(estimated - actual)}`}</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Per person */}
+          {numPeople > 1 && totalEstimated > 0 && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>Mỗi người ({numPeople} người)</span>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>~{formatCurrency(Math.round(totalEstimated / numPeople))}</span>
+                {totalActual > 0 && <span style={{ fontSize: 11, color: '#94a3b8', display: 'block' }}>Đã chi: ~{formatCurrency(Math.round(totalActual / numPeople))}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExpensesTab({ tripId, tripBudget, budgetData, numPeople }: {
+  tripId: number; tripBudget: number;
+  budgetData?: TripBudgetData | null;
+  numPeople: number;
+}) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [summary, setSummary] = useState<ExpenseSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterCat, setFilterCat] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
@@ -680,7 +844,6 @@ function ExpensesTab({ tripId, tripBudget }: { tripId: number; tripBudget: numbe
     try {
       const { data } = await api.get(`/trips/${tripId}/expenses`);
       setExpenses(data.expenses ?? []);
-      setSummary(data.summary ?? null);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   };
@@ -704,12 +867,6 @@ function ExpensesTab({ tripId, tripBudget }: { tripId: number; tripBudget: numbe
   }, {});
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
-  // Budget comparison
-  const totalSpent = summary?.total ?? 0;
-  const budgetSet = tripBudget > 0;
-  const overBudget = budgetSet && totalSpent > tripBudget;
-  const budgetPct = budgetSet && tripBudget > 0 ? Math.min((totalSpent / tripBudget) * 100, 100) : 0;
-
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
@@ -720,32 +877,13 @@ function ExpensesTab({ tripId, tripBudget }: { tripId: number; tripBudget: numbe
 
   return (
     <>
-      {/* Budget vs actual card */}
-      {budgetSet && (
-        <div style={{ background: '#fff', border: `1px solid ${overBudget ? 'rgba(239,68,68,0.25)' : '#e2e8f0'}`, borderRadius: 16, padding: '16px 18px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Ngân sách</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b' }}>{formatCurrency(tripBudget)}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Đã chi</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: overBudget ? '#ef4444' : '#10b981' }}>{formatCurrency(totalSpent)}</div>
-            </div>
-          </div>
-          {/* Progress bar */}
-          <div style={{ height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', width: `${budgetPct}%`, background: overBudget ? 'linear-gradient(90deg,#ef4444,#f87171)' : budgetPct > 80 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#10b981,#34d399)', borderRadius: 99, transition: 'width 0.4s ease' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: '#94a3b8' }}>{Math.round(budgetPct)}% đã dùng</span>
-            {overBudget
-              ? <span style={{ color: '#ef4444', fontWeight: 600 }}>⚠️ Vượt {formatCurrency(totalSpent - tripBudget)}</span>
-              : <span style={{ color: '#10b981', fontWeight: 600 }}>Còn lại {formatCurrency(tripBudget - totalSpent)}</span>
-            }
-          </div>
-        </div>
-      )}
+      {/* Budget Overview */}
+      <BudgetOverviewMobile
+        expenses={expenses}
+        budgetData={budgetData}
+        tripBudget={tripBudget}
+        numPeople={numPeople}
+      />
 
       {/* Category filter */}
       <div className="m-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 16, paddingBottom: 2, scrollbarWidth: 'none' }}>
@@ -907,7 +1045,7 @@ function BudgetBar({ spent, total }: { spent: number; total: number }) {
 }
 
 /* ─── Main component ─────────────────────────────────────────────────── */
-type MainTab = 'overview' | 'plan' | 'map' | 'journal' | 'expenses' | 'notes';
+type MainTab = 'overview' | 'plan' | 'map' | 'journal' | 'expenses' | 'members' | 'notes';
 
 export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onActivityDeleted, onActivityAdded }: Props) {
   const [localDays, setLocalDays] = useState<TripDay[]>(trip.days);
@@ -921,6 +1059,10 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [isPublished, setIsPublished] = useState(trip.is_published ?? false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishDesc, setPublishDesc] = useState('');
+  const [publishLoading, setPublishLoading] = useState(false);
 
   // Notes & packing
   const [notes, setNotes] = useState(trip.user_notes ?? '');
@@ -994,6 +1136,16 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
     } catch { /* ignore */ }
   };
 
+  const handlePublish = async () => {
+    setPublishLoading(true);
+    try {
+      const { data } = await api.post(`/trips/${trip.id}/publish`, { description: publishDesc });
+      setIsPublished(data.is_published);
+      setPublishOpen(false);
+    } catch { /* ignore */ }
+    finally { setPublishLoading(false); }
+  };
+
   const sendChat = async () => {
     if (!chatInput.trim() || chatLoading || chatCount >= CHAT_LIMIT) return;
     const msg = chatInput.trim();
@@ -1017,6 +1169,7 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
     { key: 'map',      label: 'Bản đồ' },
     { key: 'journal',  label: 'Nhật ký' },
     { key: 'expenses', label: 'Chi phí' },
+    { key: 'members',  label: 'Thành viên' },
     { key: 'notes',    label: 'Ghi chú' },
   ];
 
@@ -1138,6 +1291,45 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
                 style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(79,110,247,0.08)', border: 'none', borderRadius: 20, padding: '8px 16px', fontSize: 13, color: '#4f6ef7', cursor: 'pointer', fontWeight: 600 }}>
                 🔖 Lưu lịch trình
               </button>
+              <button onClick={() => setActiveTab('members')}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: '8px 16px', fontSize: 13, color: '#64748b', cursor: 'pointer', fontWeight: 500 }}>
+                👥 Thành viên
+              </button>
+              {trip.status === 'completed' && (
+                <button
+                  onClick={() => isPublished ? handlePublish() : setPublishOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: isPublished ? 'rgba(5,150,105,0.08)' : 'rgba(79,110,247,0.08)',
+                    border: `1px solid ${isPublished ? 'rgba(5,150,105,0.3)' : 'rgba(79,110,247,0.2)'}`,
+                    borderRadius: 20, padding: '8px 16px',
+                    fontSize: 13, color: isPublished ? '#059669' : '#4f6ef7',
+                    cursor: 'pointer', fontWeight: 600,
+                  }}>
+                  {isPublished ? '🌍 Đã publish' : '🌍 Publish'}
+                </button>
+              )}
+            </div>
+            {/* Sticky bottom action bar for better visibility on mobile */}
+            <div style={{ position: 'fixed', left: 12, right: 12, bottom: 'env(safe-area-inset-bottom,12px)', zIndex: 60, display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', padding: 8 }}>
+              <button onClick={handleShare} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#1e293b' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: shareCopied ? '#ecfdf5' : '#f8fafc', color: shareCopied ? '#059669' : '#64748b' }}>🔗</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{shareCopied ? 'Đã sao chép' : 'Chia sẻ'}</div>
+              </button>
+              <button onClick={() => api.post(`/trips/${trip.id}/favorites`).catch(() => {})} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#4f6ef7' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔖</div>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>Lưu</div>
+              </button>
+              <button onClick={() => setActiveTab('members')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#64748b' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>Thành viên</div>
+              </button>
+              {trip.status === 'completed' && (
+                <button onClick={() => isPublished ? handlePublish() : setPublishOpen(true)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: isPublished ? '#ecfdf5' : '#eef2ff', border: '1px solid #e2e8f0', fontSize: 13, color: isPublished ? '#059669' : '#4f6ef7' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🌍</div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{isPublished ? 'Đã publish' : 'Publish'}</div>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1251,7 +1443,19 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
         {/* ── EXPENSES TAB ── */}
         {activeTab === 'expenses' && (
           <div className="m-list" style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', background: '#f8fafc' }}>
-            <ExpensesTab tripId={trip.id} tripBudget={tripBudget} />
+            <ExpensesTab
+              tripId={trip.id}
+              tripBudget={tripBudget}
+              budgetData={trip.budget_data}
+              numPeople={trip.num_people}
+            />
+          </div>
+        )}
+
+        {/* ── MEMBERS TAB ── */}
+        {activeTab === 'members' && (
+          <div className="m-list" style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 80px', background: '#f8fafc' }}>
+            <MembersTab tripId={trip.id} />
           </div>
         )}
 
@@ -1405,9 +1609,46 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
         </div>
       )}
 
+      {/* ══ PUBLISH MODAL ═══════════════════════════════════════════════ */}
+      {publishOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <div onClick={() => setPublishOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} />
+          <div style={{ position: 'relative', background: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '0 0 env(safe-area-inset-bottom, 24px)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 99, background: '#e2e8f0' }} />
+            </div>
+            <div style={{ padding: '8px 20px 20px' }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: '0 0 6px' }}>🌍 Publish lên cộng đồng</h2>
+              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px', lineHeight: 1.6 }}>
+                Lịch trình sẽ xuất hiện trong feed cộng đồng. Người khác có thể xem và clone về tài khoản của họ.
+              </p>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Mô tả (tùy chọn)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Chia sẻ kinh nghiệm, tips cho chuyến đi này..."
+                value={publishDesc}
+                onChange={e => setPublishDesc(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: '#1e293b', resize: 'none', outline: 'none', lineHeight: 1.6, marginBottom: 14 }}
+              />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setPublishOpen(false)}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                  Hủy
+                </button>
+                <button onClick={handlePublish} disabled={publishLoading}
+                  style={{ flex: 2, padding: '12px', borderRadius: 12, border: 'none', background: publishLoading ? '#e2e8f0' : '#059669', color: publishLoading ? '#94a3b8' : '#fff', fontSize: 14, fontWeight: 700, cursor: publishLoading ? 'not-allowed' : 'pointer' }}>
+                  {publishLoading ? 'Đang publish…' : '🌍 Publish ngay'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ ADD ACTIVITY MODAL ══════════════════════════════════════════ */}
-      {addOpen && currentDay && (
-        <AddActivityModalLazy
+      {addOpen && currentDay && (        <AddActivityModalLazy
           tripId={trip.id}
           dayId={currentDay.id}
           onSaved={(newPlace: Activity) => { setAddOpen(false); onActivityAdded(currentDay.id, newPlace); }}

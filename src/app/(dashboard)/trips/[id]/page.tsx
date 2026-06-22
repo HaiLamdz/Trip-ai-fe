@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import ActivityCard from '@/components/trip/ActivityCard';
 import CostSplit from '@/components/trip/CostSplit';
 import DayCostBreakdown from '@/components/trip/DayCostBreakdown';
+import BudgetOverview from '@/components/trip/BudgetOverview';
 import ActivityEditModal from '@/components/trip/ActivityEditModal';
 import MobileTripDetail from '@/components/trip/MobileTripDetail';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -109,6 +110,10 @@ export default function TripDetailPage() {
   const [costSplitOpen, setCostSplitOpen] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishDesc, setPublishDesc] = useState('');
   const [addActivityOpen, setAddActivityOpen] = useState(false);
   // AI Chat popup
   const [chatOpen, setChatOpen] = useState(false);
@@ -127,6 +132,7 @@ export default function TripDetailPage() {
       const { data } = await api.get(`/trips/${id}`);
       setTrip(data.trip);
       setNotes(data.trip?.user_notes ?? '');
+      setIsPublished(data.trip?.is_published ?? false);
       if (data.trip?.days?.length > 0) setActiveDay(data.trip.days[0].day_number);
     } catch { router.push('/dashboard'); }
     finally { setLoading(false); }
@@ -212,6 +218,16 @@ export default function TripDetailPage() {
       const { data } = await api.post(`/trips/${trip.id}/share`);
       if (data.share_url) { await navigator.clipboard.writeText(data.share_url).catch(() => {}); setShareCopied(true); setTimeout(() => setShareCopied(false), 3000); }
     } catch { /* ignore */ } finally { setShareLoading(false); }
+  };
+
+  const handlePublish = async () => {
+    if (!trip) return;
+    setPublishLoading(true);
+    try {
+      const { data } = await api.post(`/trips/${trip.id}/publish`, { description: publishDesc });
+      setIsPublished(data.is_published);
+      setPublishOpen(false);
+    } catch { /* ignore */ } finally { setPublishLoading(false); }
   };
 
   const handleSwitchTab = (tab: 'timeline' | 'packing') => {
@@ -497,6 +513,12 @@ export default function TripDetailPage() {
         </div>  
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Thành viên */}
+          <button onClick={() => router.push(`/trips/${trip.id}/members`)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${D.border2}`, background: 'transparent', color: D.textMuted, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+            👥 Thành viên
+          </button>
+
           {/* Nhật ký */}
           <button onClick={() => router.push(`/trips/${trip.id}/journal`)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${D.border2}`, background: 'transparent', color: D.textMuted, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
@@ -515,6 +537,23 @@ export default function TripDetailPage() {
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
             {shareCopied ? 'Đã sao chép!' : 'Chia sẻ'}
           </button>
+
+          {/* Publish to community */}
+          {trip.status === 'completed' && (
+            <button
+              onClick={() => isPublished ? handlePublish() : setPublishOpen(true)}
+              disabled={publishLoading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 8,
+                border: `1px solid ${isPublished ? 'rgba(52,211,153,0.4)' : 'rgba(79,110,247,0.35)'}`,
+                background: isPublished ? 'rgba(52,211,153,0.1)' : 'transparent',
+                color: isPublished ? '#34d399' : '#818cf8',
+                cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              }}>
+              {isPublished ? '🌍 Đã publish' : '🌍 Publish'}
+            </button>
+          )}
 
           {/* Edit with AI — opens popup */}
           <button onClick={() => setChatOpen(true)}
@@ -608,6 +647,17 @@ export default function TripDetailPage() {
                     places={currentDay.places}
                     numPeople={Number(trip.num_people) || 1}
                     budget={totalEstimated || tripBudget}
+                    durationDays={Number(trip.duration_days) || 1}
+                  />
+                )}
+
+                {/* Budget Overview — full trip comparison */}
+                {trip.budget_data && (
+                  <BudgetOverview
+                    tripId={trip.id}
+                    budgetData={trip.budget_data}
+                    plannedBudget={tripBudget}
+                    numPeople={Number(trip.num_people) || 1}
                     durationDays={Number(trip.duration_days) || 1}
                   />
                 )}
@@ -778,6 +828,47 @@ export default function TripDetailPage() {
       )}
 
       {costSplitOpen && <CostSplit tripId={trip.id} onClose={() => setCostSplitOpen(false)} />}
+
+      {/* ── Publish Modal ── */}
+      {publishOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setPublishOpen(false)}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
+          <div
+            style={{ position: 'relative', width: '100%', maxWidth: 440, background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 18, padding: '24px', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: D.text, margin: '0 0 6px' }}>🌍 Publish lên cộng đồng</h2>
+            <p style={{ fontSize: 13, color: D.textMuted, margin: '0 0 18px', lineHeight: 1.6 }}>
+              Lịch trình sẽ xuất hiện trong feed cộng đồng. Người khác có thể xem và clone về tài khoản của họ.
+            </p>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: D.textMuted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Mô tả (tùy chọn)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Chia sẻ kinh nghiệm, tips cho chuyến đi này..."
+                value={publishDesc}
+                onChange={e => setPublishDesc(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', background: D.surface2, border: `1px solid ${D.border2}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: D.text, resize: 'none', outline: 'none', lineHeight: 1.6 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setPublishOpen(false)}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, border: `1px solid ${D.border2}`, background: 'transparent', color: D.textMuted, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                Hủy
+              </button>
+              <button onClick={handlePublish} disabled={publishLoading}
+                style={{ flex: 2, padding: '11px', borderRadius: 10, border: 'none', background: '#059669', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                {publishLoading ? (
+                  <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                ) : '🌍 Publish ngay'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {addActivityOpen && currentDay && (
         <ActivityEditModal

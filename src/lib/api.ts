@@ -26,12 +26,20 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+// Auth endpoints không cần refresh — bỏ qua interceptor
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh'];
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Nếu là auth endpoint hoặc đã retry rồi → reject ngay, không refresh
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((ep) =>
+      originalRequest?.url?.includes(ep)
+    );
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
