@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Loader } from '@googlemaps/js-api-loader';
 import { PLACE_TYPE_COLORS } from '@/lib/utils';
 
 interface Place {
@@ -48,108 +49,97 @@ const DAY_COLORS = [
 
 export default function TripMap({ places, days, activePlace, activeDayNumber, onMarkerClick }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<unknown>(null);
-  const markersRef = useRef<Map<string, unknown>>(new Map());
-  const polylinesRef = useRef<unknown[]>([]);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const polylinesRef = useRef<{ polyline: google.maps.Polyline; dayNumber: number }[]>([]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    import('leaflet').then((L) => {
-      // Fix default icon paths
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
+    const loader = new Loader({
+      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+      version: 'weekly',
+      libraries: ['places'],
+    });
 
-      const map = L.map(mapRef.current!, {
-        zoomControl: false,
-        attributionControl: false,
-      }).setView([16.0544, 108.2022], 12);
+    loader.load().then(() => {
+      const map = new google.maps.Map(mapRef.current!, {
+        center: { lat: 16.0544, lng: 108.2022 },
+        zoom: 12,
+        zoomControl: true,
+        zoomControlOptions: { position: google.maps.ControlPosition.BOTTOM_RIGHT },
+        streetViewControl: false,
+        mapTypeControl: false,
+        fullscreenControl: false,
+        styles: [
+          {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+        ],
+      });
 
       mapInstanceRef.current = map;
 
-      // Add zoom control bottom-right
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-      // Attribution bottom-left, minimal
-      L.control.attribution({ position: 'bottomleft', prefix: false })
-        .addAttribution('© <a href="https://openstreetmap.org">OSM</a>')
-        .addTo(map);
-
-      // Tile layer — CartoDB Positron for clean look
-      L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        { subdomains: 'abcd', maxZoom: 19 }
-      ).addTo(map);
-
-      const bounds: [number, number][] = [];
+      const bounds = new google.maps.LatLngBounds();
 
       days.forEach((day, dayIdx) => {
         const color = DAY_COLORS[dayIdx % DAY_COLORS.length];
         const validPlaces = day.places
-          .filter(p => p.latitude && p.longitude)
+          .filter(p => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude) && !isNaN(p.longitude))
           .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-        const coords: [number, number][] = validPlaces.map(p => [p.latitude!, p.longitude!]);
+        const coords = validPlaces.map(p => ({ lat: Number(p.latitude), lng: Number(p.longitude) }));
 
         // Draw polyline — hidden by default, shown only for active day
         if (coords.length > 1) {
-          const line = L.polyline(coords, {
-            color,
-            weight: 3,
-            opacity: 0,          // start hidden
-            dashArray: undefined,
-            lineJoin: 'round',
-            lineCap: 'round',
-          }).addTo(map);
-          // tag with day number for later toggling
-          (line as unknown as { _dayNumber: number })._dayNumber = day.day_number;
-          polylinesRef.current.push(line);
+          const polyline = new google.maps.Polyline({
+            path: coords,
+            strokeColor: color,
+            strokeOpacity: 0,
+            strokeWeight: 3,
+            map: map,
+          });
+          polylinesRef.current.push({ polyline, dayNumber: day.day_number });
         }
 
         // Numbered markers
         validPlaces.forEach((place, placeIdx) => {
-          if (!place.latitude || !place.longitude) return;
-          bounds.push([place.latitude, place.longitude]);
+          const lat = Number(place.latitude);
+          const lng = Number(place.longitude);
+          bounds.extend({ lat, lng });
 
           const num = placeIdx + 1;
           const typeColor = PLACE_TYPE_COLORS[place.place_type] || color;
 
-          const icon = L.divIcon({
-            html: `
-              <div style="
-                position:relative;
-                width:32px;height:32px;
-                display:flex;align-items:center;justify-content:center;
-              ">
-                <div style="
-                  width:28px;height:28px;
-                  background:${typeColor};
-                  border-radius:50% 50% 50% 0;
-                  transform:rotate(-45deg);
-                  border:2px solid white;
-                  box-shadow:0 2px 8px rgba(0,0,0,0.25);
-                "></div>
-                <span style="
-                  position:absolute;
-                  color:white;
-                  font-size:11px;
-                  font-weight:700;
-                  font-family:system-ui,sans-serif;
-                  line-height:1;
-                  transform:translateY(-2px);
-                ">${num}</span>
-              </div>
-            `,
-            className: '',
-            iconSize: [32, 32],
-            iconAnchor: [14, 28],
-            popupAnchor: [2, -28],
+          // Create custom marker using SVG
+          const markerIcon = {
+            path: `M 0 0 C -10 -10 -10 -25 0 -35 C 10 -25 10 -10 0 0 Z`,
+            fillColor: typeColor,
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 1.2,
+            anchor: new google.maps.Point(0, 35),
+          };
+
+          const marker = new google.maps.Marker({
+            position: { lat, lng },
+            map,
+            icon: markerIcon,
+            label: {
+              text: num.toString(),
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: '700',
+              className: 'custom-marker-label',
+            },
           });
 
-          const marker = L.marker([place.latitude, place.longitude], { icon })
-            .addTo(map)
-            .bindPopup(`
-              <div style="min-width:200px;font-family:system-ui,sans-serif">
+          const infoWindow = new google.maps.InfoWindow({
+            content: `
+              <div style="min-width:200px;font-family:system-ui,sans-serif;padding:8px">
                 <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">${place.title}</div>
                 <div style="font-size:11px;color:#555;margin-bottom:6px;font-style:italic">${place.place_name}</div>
                 <div style="display:flex;gap:8px;font-size:11px;color:#555;margin-bottom:6px">
@@ -158,89 +148,71 @@ export default function TripMap({ places, days, activePlace, activeDayNumber, on
                 </div>
                 ${place.description ? `<div style="font-size:11px;color:#666;margin-bottom:8px;line-height:1.4">${place.description.slice(0, 100)}${place.description.length > 100 ? '…' : ''}</div>` : ''}
                 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.place_name)}" target="_blank" rel="noopener"
-                  style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#4285f4;text-decoration:none;background:#f0f4ff;padding:4px 10px;border-radius:6px">
+                  style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#4285f4;text-decoration:none;background:#f0f4ff;padding:4px 10px;border-radius:6px;margin-top:4px">
                   🗺 Mở Google Maps
                 </a>
               </div>
-            `, { maxWidth: 240 });
+            `,
+            maxWidth: 240,
+          });
 
-          if (onMarkerClick) {
-            marker.on('click', () => onMarkerClick(place));
-          }
+          marker.addListener('click', () => {
+            infoWindow.open(map, marker);
+            if (onMarkerClick) onMarkerClick(place);
+          });
 
           const key = `${place.latitude},${place.longitude},${place.title}`;
           markersRef.current.set(key, marker);
 
           // ── Check-in photo overlay marker ──
           if (place.checked_in_at && place.checkin_photo_url) {
-            const checkinIcon = L.divIcon({
-              html: `
-                <div style="
-                  position:relative;
-                  width:52px; height:52px;
-                ">
-                  <div style="
-                    width:48px; height:48px;
-                    border-radius:50%;
-                    overflow:hidden;
-                    border:3px solid #34d399;
-                    box-shadow:0 2px 12px rgba(0,0,0,0.45);
-                    background:#1c2128;
-                  ">
-                    <img
-                      src="${place.checkin_photo_url}"
-                      style="width:100%;height:100%;object-fit:cover"
-                      onerror="this.style.display='none'"
-                    />
-                  </div>
-                  <div style="
-                    position:absolute;bottom:-2px;right:-2px;
-                    width:18px;height:18px;
-                    border-radius:50%;
-                    background:#34d399;
-                    border:2px solid #0d1117;
-                    display:flex;align-items:center;justify-content:center;
-                    font-size:9px;line-height:1;
-                  ">✓</div>
-                </div>
-              `,
-              className: '',
-              iconSize: [52, 52],
-              iconAnchor: [26, 52],
-              popupAnchor: [0, -54],
+            const checkinMarker = new google.maps.Marker({
+              position: { lat, lng },
+              map,
+              icon: {
+                url: place.checkin_photo_url,
+                scaledSize: new google.maps.Size(48, 48),
+                anchor: new google.maps.Point(24, 48),
+              },
+              zIndex: 500,
             });
 
             const checkinNote = place.checkin_note ? `<div style="font-size:11px;color:#34d399;margin-top:6px;font-style:italic">"${place.checkin_note}"</div>` : '';
 
-            L.marker([place.latitude, place.longitude], { icon: checkinIcon, zIndexOffset: 500 })
-              .addTo(map)
-              .bindPopup(`
-                <div style="min-width:200px;font-family:system-ui,sans-serif">
+            const checkinInfoWindow = new google.maps.InfoWindow({
+              content: `
+                <div style="min-width:200px;font-family:system-ui,sans-serif;padding:8px">
                   <img src="${place.checkin_photo_url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" />
                   <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">📍 ${place.title}</div>
                   <div style="font-size:11px;color:#555">${place.place_name}</div>
                   ${checkinNote}
                 </div>
-              `, { maxWidth: 220 });
+              `,
+              maxWidth: 220,
+            });
+
+            checkinMarker.addListener('click', () => {
+              checkinInfoWindow.open(map, checkinMarker);
+            });
           }
         });
       });
 
-      if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [40, 40] });
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 40 });
       }
 
       // Show first day's polyline by default
       const initialDay = activeDayNumber ?? days[0]?.day_number ?? 1;
-      polylinesRef.current.forEach((line) => {
-        const pl = line as unknown as { _dayNumber: number; setStyle: (s: object) => void };
-        pl.setStyle({ opacity: pl._dayNumber === initialDay ? 0.85 : 0 });
+      polylinesRef.current.forEach(({ polyline, dayNumber }) => {
+        polyline.setOptions({ strokeOpacity: dayNumber === initialDay ? 0.85 : 0 });
       });
     });
 
     return () => {
       if (mapInstanceRef.current) {
-        (mapInstanceRef.current as { remove: () => void }).remove();
+        markersRef.current.forEach(marker => marker.setMap(null));
+        polylinesRef.current.forEach(({ polyline }) => polyline.setMap(null));
         mapInstanceRef.current = null;
         markersRef.current.clear();
         polylinesRef.current = [];
@@ -252,46 +224,34 @@ export default function TripMap({ places, days, activePlace, activeDayNumber, on
   // Highlight active place
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    import('leaflet').then((L) => {
-      const map = mapInstanceRef.current as ReturnType<typeof L.map>;
-
-      if (activePlace?.latitude && activePlace?.longitude) {
-        map.flyTo([activePlace.latitude!, activePlace.longitude!], 15, { duration: 0.8 });
-      }
-    });
+    if (activePlace && activePlace.latitude !== null && activePlace.longitude !== null && !isNaN(activePlace.latitude) && !isNaN(activePlace.longitude)) {
+      mapInstanceRef.current.panTo({ lat: Number(activePlace.latitude), lng: Number(activePlace.longitude) });
+      mapInstanceRef.current.setZoom(15);
+    }
   }, [activePlace]);
 
   // Show only active day's polyline, hide others
   useEffect(() => {
     if (!mapInstanceRef.current || activeDayNumber == null) return;
-    import('leaflet').then((L) => {
-      polylinesRef.current.forEach((line) => {
-        const pl = line as unknown as { _dayNumber: number; setStyle: (s: object) => void };
-        pl.setStyle({ opacity: pl._dayNumber === activeDayNumber ? 0.85 : 0 });
-      });
+    polylinesRef.current.forEach(({ polyline, dayNumber }) => {
+      polyline.setOptions({ strokeOpacity: dayNumber === activeDayNumber ? 0.85 : 0 });
     });
   }, [activeDayNumber]);
 
   // Fit to active day
   useEffect(() => {
     if (!mapInstanceRef.current || activeDayNumber == null) return;
-    import('leaflet').then((L) => {
-      const map = mapInstanceRef.current as ReturnType<typeof L.map>;
-      const day = days.find(d => d.day_number === activeDayNumber);
-      if (!day) return;
-      const coords: [number, number][] = day.places
-        .filter(p => p.latitude && p.longitude)
-        .map(p => [p.latitude!, p.longitude!]);
-      if (coords.length > 0) {
-        map.fitBounds(coords, { padding: [50, 50], duration: 0.8 } as Parameters<typeof map.fitBounds>[1]);
-      }
-    });
+    const day = days.find(d => d.day_number === activeDayNumber);
+    if (!day) return;
+    const coords = day.places
+      .filter(p => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude) && !isNaN(p.longitude))
+      .map(p => ({ lat: Number(p.latitude), lng: Number(p.longitude) }));
+    if (coords.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      coords.forEach(coord => bounds.extend(coord));
+      mapInstanceRef.current.fitBounds(bounds, { padding: 50 });
+    }
   }, [activeDayNumber, days]);
 
-  return (
-    <>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <div ref={mapRef} className="w-full h-full" />
-    </>
-  );
+  return <div ref={mapRef} className="w-full h-full" />;
 }
