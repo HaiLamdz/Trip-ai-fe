@@ -199,7 +199,7 @@ export default function TripMap({ places, days, activePlace, activeDayNumber, on
       });
 
       if (!bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: 40 });
+        map.fitBounds(bounds, 40);
       }
 
       // Show first day's polyline by default
@@ -249,7 +249,8 @@ export default function TripMap({ places, days, activePlace, activeDayNumber, on
     if (coords.length > 0) {
       const bounds = new google.maps.LatLngBounds();
       coords.forEach(coord => bounds.extend(coord));
-      mapInstanceRef.current.fitBounds(bounds, { padding: 50 });
+
+      mapInstanceRef.current?.fitBounds(bounds, 50);
     }
   }, [activeDayNumber, days]);
 
