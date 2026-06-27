@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { PREFERENCES, formatCurrency } from '@/lib/utils';
 
-interface NominatimResult { display_name: string; lat: string; lon: string; }
+interface GooglePlaceResult {
+  description: string;
+  place_id: string;
+}
 
 const TRANSPORT_MODES = [
   { value: 'motorbike', label: '🛵 Xe máy' },
@@ -63,12 +66,12 @@ export default function CreateTripPage() {
   const [loading, setLoading] = useState(false);
 
   // Destination autocomplete state
-  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [suggestions, setSuggestions] = useState<GooglePlaceResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const destDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Origin autocomplete state
-  const [originSuggestions, setOriginSuggestions] = useState<NominatimResult[]>([]);
+  const [originSuggestions, setOriginSuggestions] = useState<GooglePlaceResult[]>([]);
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
   const originDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -82,10 +85,10 @@ export default function CreateTripPage() {
     destDebounce.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5`,
-          { headers: { 'Accept-Language': 'vi' } },
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(value)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=vi`,
         );
-        setSuggestions(await res.json());
+        const data = await res.json();
+        setSuggestions(data.predictions || []);
         setShowSuggestions(true);
       } catch {}
     }, 300);
@@ -99,10 +102,10 @@ export default function CreateTripPage() {
     originDebounce.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5`,
-          { headers: { 'Accept-Language': 'vi' } },
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(value)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=vi`,
         );
-        setOriginSuggestions(await res.json());
+        const data = await res.json();
+        setOriginSuggestions(data.predictions || []);
         setShowOriginSuggestions(true);
       } catch {}
     }, 300);
@@ -862,16 +865,16 @@ function AutocompleteDropdown({
   items,
   onSelect,
 }: {
-  items: NominatimResult[];
+  items: GooglePlaceResult[];
   onSelect: (name: string) => void;
 }) {
   return (
     <div style={{ position: 'absolute', zIndex: 20, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
       {items.map((s, i) => (
-        <button key={i} type="button"
-          onClick={() => onSelect(s.display_name)}
+        <button key={s.place_id} type="button"
+          onClick={() => onSelect(s.description)}
           style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#1e293b', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}>
-          📍 {s.display_name}
+          📍 {s.description}
         </button>
       ))}
     </div>

@@ -126,7 +126,7 @@ export default function NearbyPlaces({ tripId, placeName, placeType, lat, lng, o
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-xs text-gray-400 text-center">Dữ liệu từ OpenStreetMap · Bán kính 500m</p>
+          <p className="text-xs text-gray-400 text-center">Dữ liệu từ Google Maps · Bán kính 500m</p>
         </div>
       </div>
     </div>

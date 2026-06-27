@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 
-/* ─── Nominatim autocomplete ──────────────────────────────────────── */
-interface NominatimResult { display_name: string; lat: string; lon: string; }
+/* ─── Google Places Autocomplete ──────────────────────────────────────── */
+interface GooglePlaceResult {
+  description: string;
+  place_id: string;
+}
 
 function PlaceAutocomplete({
   value,
@@ -19,7 +22,7 @@ function PlaceAutocomplete({
   placeholder?: string;
   hasError?: boolean;
 }) {
-  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [suggestions, setSuggestions] = useState<GooglePlaceResult[]>([]);
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,12 +35,11 @@ function PlaceAutocomplete({
       setLoading(true);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(v)}&format=json&limit=5`,
-          { headers: { 'Accept-Language': 'vi' } },
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(v)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=vi`,
         );
-        const data: NominatimResult[] = await res.json();
-        setSuggestions(data);
-        setShow(data.length > 0);
+        const data = await res.json();
+        setSuggestions(data.predictions || []);
+        setShow(data.predictions && data.predictions.length > 0);
       } catch { /* ignore */ } finally {
         setLoading(false);
       }
@@ -78,8 +80,8 @@ function PlaceAutocomplete({
         }}>
           {suggestions.map((s, i) => (
             <button
-              key={i} type="button"
-              onMouseDown={e => { e.preventDefault(); onSelect(s.display_name); setShow(false); setSuggestions([]); }}
+              key={s.place_id} type="button"
+              onMouseDown={e => { e.preventDefault(); onSelect(s.description); setShow(false); setSuggestions([]); }}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '10px 14px', fontSize: 13, color: '#e6edf3',
@@ -87,7 +89,7 @@ function PlaceAutocomplete({
                 borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none',
               }}
             >
-              📍 {s.display_name}
+              📍 {s.description}
             </button>
           ))}
         </div>

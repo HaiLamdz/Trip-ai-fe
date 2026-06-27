@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import { useUnsplashImage } from '@/hooks/useUnsplashImage';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 const TripMap = dynamic(() => import('./TripMap'), {
   ssr: false,
@@ -220,17 +221,19 @@ function AddExpenseModal({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={onClose}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)' }} />
-      <div style={{ position: 'relative', background: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 'env(safe-area-inset-bottom, 20px)', maxHeight: '90dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
-          <div style={{ width: 36, height: 4, borderRadius: 99, background: '#e2e8f0' }} />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>{editItem ? '✏️' : '💸'}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{editItem ? 'Sửa chi phí' : 'Thêm chi phí'}</span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', margin: 0 }}>{editItem ? '✏️ Sửa chi phí' : 'Thêm chi phí'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4 }}>✕</button>
-        </div>
-        <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={lbSt}>Số tiền</label>
             <div style={{ position: 'relative' }}>
@@ -669,15 +672,95 @@ function JournalTab({ tripId }: { tripId: number }) {
 }
 
 /* ─── Members Tab ───────────────────────────────────────────────────── */
-function MembersTab({ tripId }: { tripId: number }) {
-  const [members, setMembers] = useState<{ id: number; name: string; email?: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+interface Member {
+  id: number;
+  user: { id: number; name: string; email: string; avatar: string | null };
+  role: 'editor' | 'viewer';
+  status: 'pending' | 'accepted' | 'declined';
+  invited_at: string;
+  accepted_at: string | null;
+}
 
-  useEffect(() => {
-    api.get(`/trips/${tripId}/members`).then(({ data }) => {
+interface Owner {
+  id: number; name: string; email: string; avatar: string | null;
+}
+
+const ROLE_CONFIG = {
+  owner:  { label: 'Chủ sở hữu', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  editor: { label: 'Biên tập viên', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  viewer: { label: 'Người xem', color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
+};
+
+const STATUS_CONFIG = {
+  accepted: { label: 'Đã tham gia', color: '#34d399' },
+  pending:  { label: 'Chờ chấp nhận', color: '#f59e0b' },
+  declined: { label: 'Đã từ chối', color: '#f87171' },
+};
+
+function MembersTab({ tripId }: { tripId: number }) {
+  const [owner, setOwner] = useState<Owner | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('viewer');
+  const [inviting, setInviting] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [removing, setRemoving] = useState<number | null>(null);
+
+  // Get current user from auth store
+  const { user: currentUser } = useAuthStore();
+
+  const fetchData = async () => {
+    try {
+      const { data } = await api.get(`/trips/${tripId}/members`);
+      setOwner(data.owner);
       setMembers(data.members ?? []);
-    }).catch(() => setMembers([])).finally(() => setLoading(false));
-  }, [tripId]);
+    } catch {
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, [tripId]);
+
+  const isOwner = currentUser?.id === owner?.id;
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteMsg(null);
+    try {
+      const { data } = await api.post(`/trips/${tripId}/members/invite`, {
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      setInviteMsg({ type: 'success', text: data.message });
+      setInviteEmail('');
+      await fetchData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setInviteMsg({ type: 'error', text: msg || 'Có lỗi xảy ra.' });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemove = async (memberId: number) => {
+    setRemoving(memberId);
+    try {
+      await api.delete(`/trips/${tripId}/members/${memberId}`);
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch { /* ignore */ }
+    finally { setRemoving(null); }
+  };
+
+  const handleRoleChange = async (memberId: number, role: 'editor' | 'viewer') => {
+    try {
+      await api.put(`/trips/${tripId}/members/${memberId}/role`, { role });
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role } : m));
+    } catch { /* ignore */ }
+  };
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
@@ -685,25 +768,179 @@ function MembersTab({ tripId }: { tripId: number }) {
     </div>
   );
 
-  if (members.length === 0) return (
-    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>👥</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Chưa có thành viên</div>
-      <div style={{ fontSize: 14, lineHeight: 1.7 }}>Mời thành viên vào chuyến đi để cùng lập kế hoạch.</div>
-    </div>
-  );
-
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {members.map(m => (
-        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 44, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{m.name?.[0] ?? 'U'}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{m.name}</div>
-            {m.email && <div style={{ fontSize: 12, color: '#64748b' }}>{m.email}</div>}
+    <div style={{ padding: '16px 16px 80px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Owner - luôn hiển thị */}
+      {owner && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+            Chủ sở hữu
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+              {owner.name.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{owner.name}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{owner.email}</div>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: ROLE_CONFIG.owner.color, background: ROLE_CONFIG.owner.bg, padding: '4px 10px', borderRadius: 99 }}>
+              {ROLE_CONFIG.owner.label}
+            </span>
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Invite form — chỉ owner mới thấy */}
+      {isOwner && (
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>
+            ✉️ Mời thành viên mới
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              type="email"
+              placeholder="Email tài khoản..."
+              value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value)}
+              style={{
+                padding: '10px 12px',
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                borderRadius: 10, fontSize: 13, color: '#1e293b', outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value as 'editor' | 'viewer')}
+                style={{
+                  flex: 1, padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0',
+                  borderRadius: 10, fontSize: 13, color: '#1e293b', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                <option value="viewer">👁 Người xem</option>
+                <option value="editor">✏️ Biên tập viên</option>
+              </select>
+              <button
+                onClick={handleInvite}
+                disabled={inviting || !inviteEmail.trim()}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none',
+                  background: inviting ? '#e2e8f0' : '#4f6ef7',
+                  color: inviting ? '#94a3b8' : '#fff', fontSize: 13, fontWeight: 700,
+                  cursor: inviting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {inviting ? 'Đang mời…' : 'Mời'}
+              </button>
+            </div>
+          </div>
+
+          {inviteMsg && (
+            <div style={{
+              marginTop: 10, fontSize: 12, fontWeight: 500,
+              color: inviteMsg.type === 'success' ? '#10b981' : '#ef4444',
+              background: inviteMsg.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${inviteMsg.type === 'success' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              borderRadius: 8, padding: '8px 12px',
+            }}>
+              {inviteMsg.type === 'success' ? '✓' : '✕'} {inviteMsg.text}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+            <strong style={{ color: '#64748b' }}>Biên tập viên</strong> — có thể thêm/sửa hoạt động.<br />
+            <strong style={{ color: '#64748b' }}>Người xem</strong> — chỉ xem lịch trình.
+          </div>
+        </div>
+      )}
+
+      {/* Members list */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+          Thành viên ({members.length})
+        </div>
+
+        {members.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>👤</div>
+            <div style={{ fontSize: 14 }}>Chưa có thành viên nào.</div>
+            {isOwner && <div style={{ fontSize: 12, marginTop: 4 }}>Mời bạn bè qua email để cùng lên kế hoạch.</div>}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {members.map(m => {
+              const roleConfig = ROLE_CONFIG[m.role];
+              const statusConfig = STATUS_CONFIG[m.status];
+              return (
+                <div key={m.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  background: '#fff', border: '1px solid #e2e8f0',
+                  borderRadius: 14, padding: '12px 14px',
+                  opacity: m.status === 'declined' ? 0.5 : 1,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#4f6ef7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    {m.user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{m.user.name}</div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>{m.user.email}</div>
+                    <div style={{ fontSize: 11, color: statusConfig.color, marginTop: 2, fontWeight: 500 }}>
+                      {statusConfig.label}
+                    </div>
+                  </div>
+                  {/* Role badge / selector */}
+                  {isOwner && m.status === 'accepted' ? (
+                    <select
+                      value={m.role}
+                      onChange={e => handleRoleChange(m.id, e.target.value as 'editor' | 'viewer')}
+                      style={{
+                        padding: '5px 8px', background: roleConfig.bg, border: 'none',
+                        borderRadius: 8, fontSize: 11, fontWeight: 600, color: roleConfig.color, cursor: 'pointer', outline: 'none',
+                      }}
+                    >
+                      <option value="viewer">👁 Xem</option>
+                      <option value="editor">✏️ Sửa</option>
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: roleConfig.color, background: roleConfig.bg, padding: '4px 10px', borderRadius: 99 }}>
+                      {roleConfig.label}
+                    </span>
+                  )}
+                  {/* Remove button */}
+                  {(isOwner || m.user.id === currentUser?.id) && (
+                    <button
+                      onClick={() => handleRemove(m.id)}
+                      disabled={removing === m.id}
+                      title={m.user.id === currentUser?.id ? 'Rời nhóm' : 'Xóa thành viên'}
+                      style={{
+                        background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                        borderRadius: 8, color: '#ef4444', cursor: 'pointer', padding: '6px 10px', fontSize: 13,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {removing === m.id ? '…' : m.user.id === currentUser?.id ? '🚪' : '✕'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Info box */}
+      <div style={{
+        background: '#f8fafc', border: '1px solid #e2e8f0',
+        borderRadius: 12, padding: '12px 14px',
+      }}>
+        <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>
+          💡 Người được mời sẽ nhận lời mời qua tài khoản của họ.
+          Họ có thể chấp nhận từ mục <strong style={{ color: '#64748b' }}>Lời mời đang chờ</strong> trong trang hồ sơ.
+        </div>
+      </div>
     </div>
   );
 }
@@ -970,10 +1207,11 @@ function ExpensesTab({ tripId, tripBudget, budgetData, numPeople }: {
 }
 
 /* ─── Hero Banner ────────────────────────────────────────────────────── */
-function HeroBanner({ destination, startDate, durationDays, coverImageUrl, onBack, onShare, shareCopied }: {
+function HeroBanner({ destination, startDate, durationDays, coverImageUrl, onBack, onShare, shareCopied, onMenuClick }: {
   destination: string; startDate: string; durationDays: number;
   coverImageUrl?: string | null;
   onBack: () => void; onShare: () => void; shareCopied: boolean;
+  onMenuClick: () => void;
 }) {
   const { url: unsplashImg, fallbackColor } = useUnsplashImage('attraction', destination);
   const heroImg = coverImageUrl || unsplashImg;
@@ -994,18 +1232,16 @@ function HeroBanner({ destination, startDate, durationDays, coverImageUrl, onBac
       {/* Gradient overlay */}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.1) 40%, rgba(13,17,23,0.92) 100%)' }} />
 
-      {/* Top bar: back + share */}
+      {/* Top bar: back + menu + share */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
         <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
           ←
         </button>
-        <button onClick={onShare} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', border: 'none', color: shareCopied ? '#34d399' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {shareCopied ? (
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          ) : (
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
-          )}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onMenuClick} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+            ⋯
+          </button>
+        </div>
       </div>
 
       {/* Bottom text */}
@@ -1063,6 +1299,17 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishDesc, setPublishDesc] = useState('');
   const [publishLoading, setPublishLoading] = useState(false);
+
+  // Menu actions
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteTab, setInviteTab] = useState<'link' | 'email' | 'qr'>('link');
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('viewer');
+  const [inviting, setInviting] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   // Notes & packing
   const [notes, setNotes] = useState(trip.user_notes ?? '');
@@ -1146,6 +1393,55 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
     finally { setPublishLoading(false); }
   };
 
+  const handleSaveTrip = async () => {
+    try {
+      await api.post(`/trips/${trip.id}/favorites`);
+      setMenuOpen(false);
+    } catch { /* ignore */ }
+  };
+
+  const handleInviteModalOpen = async () => {
+    setInviteModalOpen(true);
+    setMenuOpen(false);
+    setInviteLoading(true);
+    // Fetch invite link
+    try {
+      const { data } = await api.post(`/trips/${trip.id}/invite-link`);
+      if (data.invite_url) {
+        setInviteLink(data.invite_url);
+      }
+    } catch { /* ignore */ } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (inviteLink) {
+      await navigator.clipboard.writeText(inviteLink).catch(() => {});
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 3000);
+    }
+  };
+
+  const handleInviteByEmail = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteMsg(null);
+    try {
+      const { data } = await api.post(`/trips/${trip.id}/members/invite`, {
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      setInviteMsg({ type: 'success', text: data.message });
+      setInviteEmail('');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setInviteMsg({ type: 'error', text: msg || 'Có lỗi xảy ra.' });
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const sendChat = async () => {
     if (!chatInput.trim() || chatLoading || chatCount >= CHAT_LIMIT) return;
     const msg = chatInput.trim();
@@ -1199,6 +1495,7 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
           onBack={onBack}
           onShare={handleShare}
           shareCopied={shareCopied}
+          onMenuClick={() => setMenuOpen(true)}
         />
 
         {/* ══ BUDGET BAR ═══════════════════════════════════════════════ */}
@@ -1229,108 +1526,106 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
 
         {/* ── OVERVIEW TAB ── */}
         {activeTab === 'overview' && (
-          <div style={{ flex: 1, padding: '16px 16px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Meta chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[
-                { icon: '📅', label: formatTripDate(trip.start_date) },
-                { icon: '🗓', label: `${trip.duration_days} ngày` },
-                { icon: '👥', label: `${trip.num_people} người` },
-                { icon: '💰', label: formatCurrency(tripBudget) },
-              ].map((chip, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderRadius: 20, padding: '7px 14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                  <span style={{ fontSize: 14 }}>{chip.icon}</span>
-                  <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 500 }}>{chip.label}</span>
-                </div>
-              ))}
+          <div style={{ flex: 1, padding: '16px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Meta chips - improved layout */}
+            <div style={{ background: '#fff', borderRadius: 16, padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                {[
+                  { icon: '📅', label: formatTripDate(trip.start_date), sub: 'Ngày bắt đầu' },
+                  { icon: '🗓', label: `${trip.duration_days} ngày`, sub: 'Thời lượng' },
+                  { icon: '👥', label: `${trip.num_people} người`, sub: 'Số người' },
+                  { icon: '💰', label: formatCurrency(tripBudget), sub: 'Ngân sách' },
+                ].map((chip, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(79,110,247,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                      {chip.icon}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{chip.label}</div>
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{chip.sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
               {totalEstimated > 0 && totalEstimated !== tripBudget && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: totalEstimated > tripBudget ? 'rgba(248,113,113,0.1)' : 'rgba(52,211,153,0.1)', borderRadius: 20, padding: '7px 14px', border: `1px solid ${totalEstimated > tripBudget ? 'rgba(248,113,113,0.3)' : 'rgba(52,211,153,0.3)'}` }}>
-                  <span style={{ fontSize: 13, color: totalEstimated > tripBudget ? '#ef4444' : '#10b981', fontWeight: 600 }}>
-                    {totalEstimated > tripBudget ? '⚠️' : '✓'} {formatCurrency(totalEstimated)} dự kiến
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>Ngân sách dự kiến AI:</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: totalEstimated > tripBudget ? '#ef4444' : '#10b981' }}>
+                    {totalEstimated > tripBudget ? '⚠️' : '✓'} {formatCurrency(totalEstimated)}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Day overview cards */}
+            {/* Day overview cards - improved design */}
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Tổng quan từng ngày</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>📅 Lịch trình từng ngày</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {trip.days.map(day => {
                   const dayCost = day.places.reduce((s, p) => s + (Number(p.estimated_cost) || 0), 0);
                   return (
                     <button key={day.id} onClick={() => { setActiveDay(day.day_number); setActiveTab('plan'); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', width: '100%', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(79,110,247,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#4f6ef7', flexShrink: 0 }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '14px 16px', cursor: 'pointer', textAlign: 'left', width: '100%', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'all 0.2s' }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #4f6ef7, #818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0, boxShadow: '0 2px 8px rgba(79,110,247,0.3)' }}>
                         {day.day_number}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{formatFullDate(day.date)}</div>
-                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.places.length} địa điểm{dayCost > 0 ? ` · ${formatCurrency(dayCost)}` : ''}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>{formatFullDate(day.date)}</div>
+                        <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#64748b' }}>
+                          <span>{day.places.length} địa điểm</span>
+                          {dayCost > 0 && <span>· {formatCurrency(dayCost)}</span>}
+                        </div>
                       </div>
                       {day.weather && (
-                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                          <div style={{ fontSize: 20 }}>{WEATHER_ICONS[day.weather.icon] || '🌤️'}</div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>{Math.round(day.weather.temperature_high)}°</div>
+                        <div style={{ flexShrink: 0, textAlign: 'center', background: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: '6px 10px' }}>
+                          <div style={{ fontSize: 22 }}>{WEATHER_ICONS[day.weather.icon] || '🌤️'}</div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>{Math.round(day.weather.temperature_high)}°</div>
                         </div>
                       )}
-                      <span style={{ fontSize: 16, color: '#cbd5e1', flexShrink: 0 }}>›</span>
+                      <span style={{ fontSize: 18, color: '#cbd5e1', flexShrink: 0 }}>›</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Action pills */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={handleShare}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: '8px 16px', fontSize: 13, color: shareCopied ? '#10b981' : '#64748b', cursor: 'pointer', fontWeight: 500 }}>
-                🔗 {shareCopied ? 'Đã sao chép' : 'Chia sẻ'}
-              </button>
-              <button onClick={() => api.post(`/trips/${trip.id}/favorites`).catch(() => {})}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(79,110,247,0.08)', border: 'none', borderRadius: 20, padding: '8px 16px', fontSize: 13, color: '#4f6ef7', cursor: 'pointer', fontWeight: 600 }}>
-                🔖 Lưu lịch trình
-              </button>
-              <button onClick={() => setActiveTab('members')}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: '8px 16px', fontSize: 13, color: '#64748b', cursor: 'pointer', fontWeight: 500 }}>
-                👥 Thành viên
-              </button>
-              {trip.status === 'completed' && (
-                <button
-                  onClick={() => isPublished ? handlePublish() : setPublishOpen(true)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: isPublished ? 'rgba(5,150,105,0.08)' : 'rgba(79,110,247,0.08)',
-                    border: `1px solid ${isPublished ? 'rgba(5,150,105,0.3)' : 'rgba(79,110,247,0.2)'}`,
-                    borderRadius: 20, padding: '8px 16px',
-                    fontSize: 13, color: isPublished ? '#059669' : '#4f6ef7',
-                    cursor: 'pointer', fontWeight: 600,
-                  }}>
-                  {isPublished ? '🌍 Đã publish' : '🌍 Publish'}
+            {/* Quick actions - cleaner design */}
+            {/* <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>⚡ Hành động nhanh</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                <button onClick={handleShare}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: shareCopied ? '#ecfdf5' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: shareCopied ? '#059669' : '#64748b' }}>
+                    {shareCopied ? '✓' : '🔗'}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{shareCopied ? 'Đã copy' : 'Chia sẻ'}</span>
                 </button>
-              )}
-            </div>
-            {/* Sticky bottom action bar for better visibility on mobile */}
-            <div style={{ position: 'fixed', left: 12, right: 12, bottom: 'env(safe-area-inset-bottom,12px)', zIndex: 60, display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', padding: 8 }}>
-              <button onClick={handleShare} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#1e293b' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: shareCopied ? '#ecfdf5' : '#f8fafc', color: shareCopied ? '#059669' : '#64748b' }}>🔗</div>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>{shareCopied ? 'Đã sao chép' : 'Chia sẻ'}</div>
-              </button>
-              <button onClick={() => api.post(`/trips/${trip.id}/favorites`).catch(() => {})} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#4f6ef7' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔖</div>
-                <div style={{ fontSize: 12, fontWeight: 700 }}>Lưu</div>
-              </button>
-              <button onClick={() => setActiveTab('members')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#64748b' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>Thành viên</div>
-              </button>
-              {trip.status === 'completed' && (
-                <button onClick={() => isPublished ? handlePublish() : setPublishOpen(true)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, background: isPublished ? '#ecfdf5' : '#eef2ff', border: '1px solid #e2e8f0', fontSize: 13, color: isPublished ? '#059669' : '#4f6ef7' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🌍</div>
-                  <div style={{ fontSize: 12, fontWeight: 600 }}>{isPublished ? 'Đã publish' : 'Publish'}</div>
+                <button onClick={() => api.post(`/trips/${trip.id}/favorites`).catch(() => {})}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(79,110,247,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#4f6ef7' }}>
+                    🔖
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>Lưu lịch trình</span>
                 </button>
-              )}
-            </div>
+                <button onClick={() => setActiveTab('members')}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245,158,11,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#f59e0b' }}>
+                    👥
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>Thành viên</span>
+                </button>
+                {trip.status === 'completed' && (
+                  <button
+                    onClick={() => isPublished ? handlePublish() : setPublishOpen(true)}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: isPublished ? 'rgba(5,150,105,0.08)' : '#fff', border: `1px solid ${isPublished ? 'rgba(5,150,105,0.3)' : '#e2e8f0'}`, borderRadius: 16, padding: '16px', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: isPublished ? 'rgba(5,150,105,0.15)' : 'rgba(79,110,247,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: isPublished ? '#059669' : '#4f6ef7' }}>
+                      🌍
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{isPublished ? 'Đã publish' : 'Publish'}</span>
+                  </button>
+                )}
+              </div>
+            </div> */}
           </div>
         )}
 
@@ -1611,16 +1906,22 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
 
       {/* ══ PUBLISH MODAL ═══════════════════════════════════════════════ */}
       {publishOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div onClick={() => setPublishOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} />
-          <div style={{ position: 'relative', background: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '0 0 env(safe-area-inset-bottom, 24px)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
-              <div style={{ width: 36, height: 4, borderRadius: 99, background: '#e2e8f0' }} />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPublishOpen(false)}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>🌍</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Publish lên cộng đồng</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, paddingLeft: 26 }}>Lịch trình sẽ xuất hiện trong feed cộng đồng</div>
+              </div>
+              <button onClick={() => setPublishOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
             </div>
-            <div style={{ padding: '8px 20px 20px' }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: '0 0 6px' }}>🌍 Publish lên cộng đồng</h2>
+            <div style={{ padding: '18px 20px' }}>
               <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px', lineHeight: 1.6 }}>
-                Lịch trình sẽ xuất hiện trong feed cộng đồng. Người khác có thể xem và clone về tài khoản của họ.
+                Người khác có thể xem và clone về tài khoản của họ.
               </p>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Mô tả (tùy chọn)
@@ -1654,6 +1955,163 @@ export default function MobileTripDetail({ trip, onBack, onActivityUpdated, onAc
           onSaved={(newPlace: Activity) => { setAddOpen(false); onActivityAdded(currentDay.id, newPlace); }}
           onClose={() => setAddOpen(false)}
         />
+      )}
+
+      {/* ══ MENU DROPDOWN ═══════════════════════════════════════════════ */}
+      {menuOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setMenuOpen(false)}>
+          <div style={{ position: 'absolute', top: 60, right: 16, background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.15)', minWidth: 200, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => { setMenuOpen(false); if (trip.status === 'completed') setPublishOpen(true); }}
+              style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#1e293b' }}>
+              🌍 Publish lịch trình
+            </button>
+            <button onClick={handleSaveTrip}
+              style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#1e293b' }}>
+              🔖 Lưu lịch trình
+            </button>
+            <button onClick={handleInviteModalOpen}
+              style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#1e293b' }}>
+              👥 Thêm thành viên
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══ INVITE MODAL ═════════════════════════════════════════════════ */}
+      {inviteModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setInviteModalOpen(false)}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>👥</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Mời bạn đồng hành</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, paddingLeft: 26 }}>Mời bạn bè cùng xem và chỉnh sửa lịch trình chuyến đi</div>
+              </div>
+              <button onClick={() => setInviteModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
+            </div>
+            <div style={{ padding: '18px 20px' }}>
+
+              {/* Tab selector */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, background: '#f8fafc', padding: 4, borderRadius: 12 }}>
+                <button onClick={() => setInviteTab('link')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: inviteTab === 'link' ? '#fff' : 'transparent', color: inviteTab === 'link' ? '#4f6ef7' : '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: inviteTab === 'link' ? '0 1px 4px rgba(0,0,0,0.05)' : 'none' }}>
+                  🔗 Link
+                </button>
+                <button onClick={() => setInviteTab('email')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: inviteTab === 'email' ? '#fff' : 'transparent', color: inviteTab === 'email' ? '#4f6ef7' : '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: inviteTab === 'email' ? '0 1px 4px rgba(0,0,0,0.05)' : 'none' }}>
+                  ✉️ Email
+                </button>
+                <button onClick={() => setInviteTab('qr')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: inviteTab === 'qr' ? '#fff' : 'transparent', color: inviteTab === 'qr' ? '#4f6ef7' : '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: inviteTab === 'qr' ? '0 1px 4px rgba(0,0,0,0.05)' : 'none' }}>
+                  📱 QR
+                </button>
+              </div>
+
+              {/* Link tab */}
+              {inviteTab === 'link' && (
+                <div>
+                  {inviteLoading ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                      <div style={{ width: 24, height: 24, border: '2px solid #e2e8f0', borderTopColor: '#4f6ef7', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                      <div style={{ fontSize: 13 }}>Đang chuẩn bị link mời...</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Link mời tham gia:</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input readOnly value={inviteLink} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: '#1e293b', outline: 'none' }} />
+                          <button onClick={handleCopyInviteLink} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#4f6ef7', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                            {shareCopied ? '✓ Đã copy' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                        💡 Chia sẻ link này để bạn bè có thể tham gia lịch trình.
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Email tab */}
+              {inviteTab === 'email' && (
+                <div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>Email người dùng:</label>
+                    <input
+                      type="email"
+                      placeholder="email@example.com"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#1e293b', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>Quyền hạn:</label>
+                    <select
+                      value={inviteRole}
+                      onChange={e => setInviteRole(e.target.value as 'editor' | 'viewer')}
+                      style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                    >
+                      <option value="viewer">👁 Người xem - chỉ xem lịch trình</option>
+                      <option value="editor">✏️ Biên tập viên - có thể chỉnh sửa</option>
+                    </select>
+                  </div>
+                  {inviteMsg && (
+                    <div style={{
+                      marginBottom: 12, fontSize: 12, fontWeight: 500,
+                      color: inviteMsg.type === 'success' ? '#10b981' : '#ef4444',
+                      background: inviteMsg.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                      border: `1px solid ${inviteMsg.type === 'success' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                      borderRadius: 8, padding: '10px 12px',
+                    }}>
+                      {inviteMsg.type === 'success' ? '✓' : '✕'} {inviteMsg.text}
+                    </div>
+                  )}
+                  <button onClick={handleInviteByEmail} disabled={inviting || !inviteEmail.trim()}
+                    style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: inviting ? '#e2e8f0' : '#4f6ef7', color: inviting ? '#94a3b8' : '#fff', fontSize: 14, fontWeight: 700, cursor: inviting ? 'not-allowed' : 'pointer' }}>
+                    {inviting ? 'Đang mời…' : 'Gửi lời mời'}
+                  </button>
+                </div>
+              )}
+
+              {/* QR tab */}
+              {inviteTab === 'qr' && (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  {inviteLoading ? (
+                    <div style={{ width: 200, height: 200, margin: '0 auto 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 24, height: 24, border: '2px solid #e2e8f0', borderTopColor: '#4f6ef7', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    </div>
+                  ) : (
+                    <div style={{ width: 200, height: 200, margin: '0 auto 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {inviteLink ? (
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(inviteLink)}`}
+                          alt="QR Code"
+                          style={{ width: '100%', height: '100%' }}
+                        />
+                      ) : (
+                        <div style={{ fontSize: 14, color: '#94a3b8' }}>QR Code</div>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                    Quét mã QR để tham gia lịch trình
+                  </div>
+                </div>
+              )}
+
+              {/* Member list button */}
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                <button onClick={() => { setInviteModalOpen(false); setActiveTab('members'); }}
+                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  👥 Xem danh sách thành viên
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
