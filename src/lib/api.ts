@@ -7,8 +7,18 @@ const api: AxiosInstance = axios.create({
 });
 
 // ─── Request interceptor: attach JWT ───────────────────────────────────────
+// Public endpoints không cần auth token (chỉ GET requests)
+const PUBLIC_ENDPOINTS = ['/trips/invite/', '/trips/share/', '/community', '/health'];
+
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (typeof window !== 'undefined') {
+  const isPublicEndpoint = PUBLIC_ENDPOINTS.some((ep) =>
+    config.url?.includes(ep)
+  );
+
+  // Chỉ bỏ qua auth token cho GET requests đến public endpoints
+  const shouldSkipAuth = isPublicEndpoint && config.method === 'get';
+
+  if (typeof window !== 'undefined' && !shouldSkipAuth) {
     const token = localStorage.getItem('jwt_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -27,7 +37,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
 };
 
 // Auth endpoints không cần refresh — bỏ qua interceptor
-const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh'];
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh', '/trips/invite/'];
 
 api.interceptors.response.use(
   (response) => response,
