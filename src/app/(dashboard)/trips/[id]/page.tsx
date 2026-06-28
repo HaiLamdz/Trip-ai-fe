@@ -124,8 +124,9 @@ export default function TripDetailPage() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const isMobile = useIsMobile();
-  const isProcessing = trip?.status === 'processing' || (!trip && loading);
-  const { status: pollStatus } = useTripStatus(id, isProcessing);
+  const { status: pollStatus } = useTripStatus(id, trip?.status === 'processing' || (!trip && loading));
+  const effectiveStatus = pollStatus?.status ?? trip?.status;
+  const isProcessing = effectiveStatus === 'processing' || (!trip && loading);
 
   const fetchTrip = useCallback(async () => {
     try {
@@ -141,12 +142,15 @@ export default function TripDetailPage() {
   // Initial load
   useEffect(() => { fetchTrip(); }, [fetchTrip]);
 
-  // When poll detects completed/failed → reload full trip data
+  // When poll detects completed/failed → refresh trip details
   useEffect(() => {
-    if (pollStatus?.status === 'completed' || pollStatus?.status === 'failed') {
+    if (!pollStatus) return;
+
+    if (pollStatus.status === 'completed' || pollStatus.status === 'failed') {
+      setTrip((prev) => (prev ? { ...prev, status: pollStatus.status } : prev));
       fetchTrip();
     }
-  }, [pollStatus?.status, fetchTrip]);
+  }, [pollStatus, fetchTrip]);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -265,197 +269,215 @@ export default function TripDetailPage() {
   };
 
   // ── Loading states ────────────────────────────────────────────────────────
-  if (loading || trip?.status === 'processing') {
-    const isCompleted = pollStatus?.status === 'completed';
-    const isFailed    = pollStatus?.status === 'failed';
+  if (isProcessing) {
+    const isCompleted = effectiveStatus === 'completed';
+    const isFailed = effectiveStatus === 'failed';
 
     const statusLabel = isCompleted
       ? 'Hoàn tất'
       : isFailed
         ? 'Thất bại'
-        : (pollStatus?.progress_message || 'Đang xử lý…');
+        : (pollStatus?.progress_message || 'Trip AI đang chuẩn bị hành trình…');
 
     return (
       <div style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'radial-gradient(ellipse 100% 70% at 50% 30%, #1e0a4a 0%, #0d0520 45%, #050210 100%)',
+        justifyContent: 'center',
+        padding: 24,
+        background: '#f8fafc',
+        color: '#0f172a',
         fontFamily: 'Inter, system-ui, sans-serif',
-        overflow: 'hidden',
-        position: 'relative',
       }}>
-        <style>{`
-          @keyframes ld-float {
-            0%, 100% { transform: translateY(0px); }
-            50%       { transform: translateY(-10px); }
-          }
-          @keyframes ld-ring-spin {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(360deg); }
-          }
-          @keyframes ld-ring-spin-r {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(-360deg); }
-          }
-          @keyframes ld-glow {
-            0%, 100% { opacity: 0.5; transform: scale(0.95); }
-            50%       { opacity: 1;   transform: scale(1.05); }
-          }
-          @keyframes ld-bar {
-            from { width: 0%; }
-            to   { width: 82%; }
-          }
-          @keyframes ld-fade-up {
-            from { opacity: 0; transform: translateY(16px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes ld-dot {
-            0%, 100% { opacity: 0.15; }
-            50%       { opacity: 0.9; }
-          }
-        `}</style>
-
-        {/* ── Center block ── */}
         <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          animation: 'ld-fade-up 0.5s ease both',
+          width: '100%',
+          maxWidth: 960,
+          display: 'grid',
+          gap: 24,
         }}>
-
-          {/* ── Icon ring group ── */}
-          <div style={{ position: 'relative', width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 36 }}>
-
-            {/* Outer glow blob */}
-            <div style={{
-              position: 'absolute', width: 190, height: 190, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(100,60,220,0.35) 0%, transparent 70%)',
-              animation: 'ld-glow 3s ease-in-out infinite',
-            }} />
-
-            {/* Outer dashed ring — spins slowly */}
-            <div style={{
-              position: 'absolute', width: 180, height: 180, borderRadius: '50%',
-              border: '1px dashed rgba(140,100,255,0.3)',
-              animation: 'ld-ring-spin 12s linear infinite',
-            }} />
-
-            {/* Inner solid ring — spins opposite */}
-            <div style={{
-              position: 'absolute', width: 148, height: 148, borderRadius: '50%',
-              border: '1.5px solid rgba(80,200,255,0.2)',
-              animation: 'ld-ring-spin-r 8s linear infinite',
-            }} />
-
-            {/* 3 orbit dots on inner ring */}
-            {[0, 120, 240].map((deg, i) => (
-              <div key={i} style={{
-                position: 'absolute', width: 148, height: 148,
-                borderRadius: '50%',
-                animation: `ld-ring-spin-r 8s linear infinite`,
-                animationDelay: `${i * 0}s`,
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: '50%', left: '50%',
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: 'rgba(120,180,255,0.8)',
-                  boxShadow: '0 0 6px rgba(120,180,255,0.9)',
-                  transform: `rotate(${deg}deg) translateX(74px) translateY(-50%)`,
-                }} />
-              </div>
-            ))}
-
-            {/* Icon circle */}
-            <div style={{
-              position: 'relative',
-              width: 104, height: 104, borderRadius: '50%',
-              background: 'linear-gradient(145deg, #2aafd4 0%, #3b6fd4 50%, #6b35d4 100%)',
-              boxShadow: '0 0 0 8px rgba(60,100,220,0.15), 0 0 50px rgba(60,120,240,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              animation: 'ld-float 3.5s ease-in-out infinite',
-            }}>
-              {/* dot grid texture */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 20,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <div>
               <div style={{
-                position: 'absolute', inset: 0, borderRadius: '50%', overflow: 'hidden', opacity: 0.25,
-                backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)',
-                backgroundSize: '9px 9px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.2em',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#7dd3fc',
+                marginBottom: 8,
+              }}>
+                Trip đang tải
+              </div>
+              <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.05 }}>
+                Đang mở lịch trình của bạn
+              </div>
+            </div>
+
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 18,
+              border: '1px solid rgba(15,23,42,0.08)',
+              display: 'grid',
+              placeItems: 'center',
+              background: '#f8fafc',
+            }}>
+              <div style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                border: '3px solid rgba(125,211,252,0.85)',
+                borderTopColor: 'transparent',
+                animation: 'spin 0.9s linear infinite',
               }} />
-              {/* icon */}
-              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style={{ position: 'relative', zIndex: 1 }}>
-                <rect x="2" y="7" width="20" height="13" rx="2" fill="rgba(255,255,255,0.95)" />
-                <rect x="8" y="4" width="8" height="4" rx="1" fill="rgba(255,255,255,0.7)" />
-                <circle cx="8.5" cy="13" r="1.5" fill="#3b6fd4" />
-                <circle cx="15.5" cy="13" r="1.5" fill="#3b6fd4" />
-                <path d="M9 17h6" stroke="#3b6fd4" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
             </div>
           </div>
 
-          {/* Brand name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            {/* dot indicator */}
-            {!isFailed && (
-              <div style={{ display: 'flex', gap: 3 }}>
-                {[0, 0.3, 0.6].map((delay, i) => (
-                  <div key={i} style={{
-                    width: 5, height: 5, borderRadius: '50%',
-                    background: '#a78bfa',
-                    animation: `ld-dot 1.2s ${delay}s ease-in-out infinite`,
-                  }} />
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+            @keyframes pulse-bg {
+              0%, 100% { opacity: 0.55; }
+              50% { opacity: 1; }
+            }
+          `}</style>
+
+          <div style={{
+            borderRadius: 24,
+            border: '1px solid rgba(15,23,42,0.08)',
+            background: '#ffffff',
+            padding: 28,
+            boxShadow: '0 24px 80px rgba(15,23,42,0.08)',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'grid',
+              gap: 18,
+            }}>
+              <div style={{
+                width: '100%',
+                height: 18,
+                borderRadius: 999,
+                background: '#e2e8f0',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  width: isCompleted ? '100%' : '44%',
+                  height: '100%',
+                  borderRadius: 999,
+                  background: 'linear-gradient(90deg, #6366f1, #7dd3fc)',
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                gap: 12,
+                color: '#475569',
+                fontSize: 13,
+              }}>
+                <span>{statusLabel}</span>
+                <span>{isCompleted ? 'Đã hoàn tất' : 'Tự động làm mới khi có kết quả'}</span>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gap: 14,
+                paddingTop: 4,
+              }}>
+                {['Đang tải lịch trình', 'Đang đồng bộ chi tiết hành trình', 'Đang nạp bản đồ và gợi ý'].map((label, index) => (
+                  <div key={label} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}>
+                    <div style={{ display: 'grid', placeItems: 'center', width: 12, height: 12, borderRadius: '50%', background: '#7dd3fc' }} />
+                    <div style={{
+                      minHeight: 18,
+                      background: '#f1f5f9',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      color: '#0f172a',
+                      fontSize: 14,
+                    }}>
+                      {label}
+                    </div>
+                    <div style={{
+                      width: 48,
+                      height: 6,
+                      borderRadius: 99,
+                      background: '#e2e8f0',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        width: `${40 + index * 15}%`,
+                        height: '100%',
+                        background: 'rgba(125,211,252,0.9)',
+                      }} />
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-            <span style={{ fontSize: 34, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px' }}>
-              Trip<span style={{ color: '#7dd3fc' }}>AI</span>
-            </span>
+
+              <div style={{
+                display: 'grid',
+                gap: 16,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                marginTop: 8,
+              }}>
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} style={{
+                    minHeight: 120,
+                    borderRadius: 20,
+                    background: '#f8fafc',
+                    border: '1px solid rgba(15,23,42,0.06)',
+                    padding: 18,
+                    animation: 'pulse-bg 1.8s ease-in-out infinite',
+                  }}>
+                    <div style={{ width: '55%', height: 18, marginBottom: 12, borderRadius: 99, background: '#e2e8f0' }} />
+                    <div style={{ width: '40%', height: 14, marginBottom: 16, borderRadius: 99, background: '#e2e8f0' }} />
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ width: '100%', height: 10, borderRadius: 99, background: '#e2e8f0' }} />
+                      <div style={{ width: '80%', height: 10, borderRadius: 99, background: '#e2e8f0' }} />
+                      <div style={{ width: '90%', height: 10, borderRadius: 99, background: '#e2e8f0' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Status subtitle */}
-          <div style={{ fontSize: 15, color: 'rgba(200,185,255,0.75)', letterSpacing: '0.5px', fontWeight: 400 }}>
-            {statusLabel}
-          </div>
-
-          {/* Failed button */}
           {isFailed && (
             <button
               onClick={() => router.push('/trips/create')}
               style={{
-                marginTop: 24, padding: '12px 32px', borderRadius: 12, border: 'none',
-                background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-                color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                boxShadow: '0 4px 20px rgba(109,40,217,0.4)',
+                width: '100%',
+                maxWidth: 360,
+                marginTop: 4,
+                padding: '14px 20px',
+                borderRadius: 16,
+                border: 'none',
+                background: '#7c3aed',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 16px 32px rgba(124,58,237,0.24)',
               }}
             >
               Tạo lại lịch trình
             </button>
           )}
         </div>
-
-        {/* ── Bottom bar ── */}
-        {!isFailed && (
-          <div style={{ width: '100%', padding: '0 28px 52px', boxSizing: 'border-box' }}>
-            {/* Label row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '2.5px', color: '#7dd3fc', textTransform: 'uppercase' }}>
-                Đang xử lý
-              </span>
-              <span style={{ fontSize: 28, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                {isCompleted ? '100%' : ''}
-              </span>
-            </div>
-            {/* Track */}
-            <div style={{ width: '100%', height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-              {isCompleted ? (
-                <div style={{ height: '100%', width: '100%', background: 'linear-gradient(90deg, #6366f1, #7dd3fc)', borderRadius: 99, transition: 'width 0.5s ease' }} />
-              ) : (
-                <div style={{ height: '100%', background: 'linear-gradient(90deg, #6366f1 0%, #a78bfa 50%, #7dd3fc 100%)', borderRadius: 99, animation: 'ld-bar 55s linear forwards' }} />
-              )}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
