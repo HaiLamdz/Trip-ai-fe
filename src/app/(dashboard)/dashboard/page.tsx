@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useUnsplashImage } from '@/hooks/useUnsplashImage';
+import MobileCommunity from '@/components/community/MobileCommunity';
 
 interface Trip {
   id: number;
@@ -457,6 +458,17 @@ export default function DashboardPage() {
                 <UpcomingTripCard key={t.id} trip={t} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Community Picks (mobile) */}
+        {!loading && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', marginBottom: 14 }}>
+              <span style={{ fontSize: 18, fontWeight: 800, color: D.text, letterSpacing: '-0.3px' }}>Từ cộng đồng</span>
+              <Link href="/community" style={{ fontSize: 13, fontWeight: 600, color: D.accent, textDecoration: 'none' }}>Xem tất cả</Link>
+            </div>
+            <MobileCommunity />
           </div>
         )}
 

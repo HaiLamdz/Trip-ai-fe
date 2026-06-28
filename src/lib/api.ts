@@ -8,7 +8,7 @@ const api: AxiosInstance = axios.create({
 
 // ─── Request interceptor: attach JWT ───────────────────────────────────────
 // Public endpoints không cần auth token (chỉ GET requests)
-const PUBLIC_ENDPOINTS = ['/trips/invite/', '/trips/share/', '/community', '/health'];
+const PUBLIC_ENDPOINTS = ['/trips/invite/', '/trips/share/', '/health'];
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const isPublicEndpoint = PUBLIC_ENDPOINTS.some((ep) =>
