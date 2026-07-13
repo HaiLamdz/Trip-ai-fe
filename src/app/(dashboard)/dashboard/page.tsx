@@ -62,7 +62,7 @@ function MobileHeroCard({ trip }: { trip: Trip }) {
   const isUpcoming = daysTo >= 0;
 
   return (
-    <div style={{ margin: '0 20px 20px', borderRadius: 20, overflow: 'hidden', position: 'relative', height: 210, boxShadow: '0 8px 32px rgba(37,99,235,0.18)' }}>
+    <div className="mobile-hero-card" style={{ margin: '0 20px 20px', borderRadius: 20, overflow: 'hidden', position: 'relative', height: 210, boxShadow: '0 8px 32px rgba(37,99,235,0.18)' }}>
       {imgUrl && (
         <Image src={imgUrl} alt={trip.destination} fill className="object-cover" sizes="100vw" unoptimized />
       )}
@@ -248,7 +248,8 @@ function MobileBottomNav() {
       background: '#fff',
       borderTop: '1px solid rgba(0,0,0,0.07)',
       display: 'flex', alignItems: 'center',
-      padding: '8px 0 env(safe-area-inset-bottom, 8px)',
+      padding: '8px 0 calc(8px + env(safe-area-inset-bottom, 8px))',
+      minHeight: 68,
       boxShadow: '0 -4px 24px rgba(0,0,0,0.06)',
     }}>
       {tabs.map(tab => {
@@ -276,7 +277,7 @@ function MobileHeader() {
   return (
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '16px 20px 12px',
+      padding: 'calc(12px + env(safe-area-inset-top, 0px)) 16px 12px',
       background: '#fff',
     }}>
       {/* hamburger */}
@@ -378,6 +379,22 @@ export default function DashboardPage() {
           .dash-desktop { display: none !important; }
         }
 
+        @media (max-width: 480px) {
+          .mobile-shell { padding-bottom: 100px !important; }
+          .mobile-greeting { padding: 12px 16px 14px !important; }
+          .mobile-greeting h1 { font-size: 22px !important; line-height: 1.2 !important; }
+          .mobile-hero-card { margin: 0 14px 14px !important; height: 190px !important; border-radius: 18px !important; }
+          .mobile-action-grid { grid-template-columns: 1fr !important; gap: 10px !important; padding: 0 14px 16px !important; }
+          .mobile-action-grid a { padding: 12px 0 !important; font-size: 13px !important; }
+          .mobile-section-header { padding: 0 14px !important; margin-bottom: 12px !important; }
+          .mobile-scroll-row { padding: 0 14px 4px !important; gap: 10px !important; }
+          .mobile-stack { padding: 0 14px !important; }
+          .mobile-memories { gap: 8px !important; padding: 0 14px !important; }
+          .mobile-stat-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin: 0 14px 24px !important; }
+          .mobile-stat-card { padding: 16px 16px 14px !important; }
+          .mobile-fab { bottom: 84px !important; right: 14px !important; width: 50px !important; height: 50px !important; }
+        }
+
         /* hide scrollbar on horizontal scroll */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -386,13 +403,13 @@ export default function DashboardPage() {
       {/* ═══════════════════════════════════════════
           MOBILE LAYOUT
       ═══════════════════════════════════════════ */}
-      <div className="dash-mobile" style={{ background: D.bg, minHeight: '100vh', fontFamily: '"Inter", system-ui, sans-serif', paddingBottom: 80 }}>
+      <div className="dash-mobile mobile-shell" style={{ background: D.bg, minHeight: '100vh', fontFamily: '"Inter", system-ui, sans-serif', paddingBottom: 92 }}>
 
         {/* Header */}
         <MobileHeader />
 
         {/* Greeting */}
-        <div style={{ padding: '8px 20px 16px', background: '#fff' }}>
+        <div className="mobile-greeting" style={{ padding: '8px 20px 16px', background: '#fff' }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: D.text, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
             {getGreeting()}, {firstName}
           </h1>
@@ -414,7 +431,7 @@ export default function DashboardPage() {
 
         {/* Check-in + Add Expense buttons */}
         {!loading && currentTrip && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 20px 20px' }}>
+          <div className="mobile-action-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 20px 20px' }}>
             <Link href={`/trips/${currentTrip.id}`} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               padding: '13px 0', borderRadius: 14,
@@ -453,7 +470,7 @@ export default function DashboardPage() {
               <span style={{ fontSize: 18, fontWeight: 800, color: D.text, letterSpacing: '-0.3px' }}>Chuyến Sắp Tới</span>
               <Link href="/trips" style={{ fontSize: 13, fontWeight: 600, color: D.accent, textDecoration: 'none' }}>Xem tất cả</Link>
             </div>
-            <div className="no-scrollbar" style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '0 20px', paddingBottom: 4 }}>
+            <div className="no-scrollbar mobile-scroll-row" style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '0 20px', paddingBottom: 4 }}>
               {upcomingTrips.map(t => (
                 <UpcomingTripCard key={t.id} trip={t} />
               ))}
@@ -499,7 +516,7 @@ export default function DashboardPage() {
                 <rect x="14" y="14" width="7" height="7" rx="1"/>
               </svg>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '0 20px' }}>
+            <div className="mobile-memories" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '0 20px' }}>
               {memories.map(t => <MemoryPhoto key={t.id} trip={t} />)}
             </div>
           </div>
@@ -507,7 +524,7 @@ export default function DashboardPage() {
 
         {/* AI Suggestions */}
         {!loading && (
-          <div style={{ marginBottom: 24, padding: '0 20px' }}>
+          <div className="mobile-stack" style={{ marginBottom: 24, padding: '0 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               {/* sparkle icon */}
               <svg width="18" height="18" viewBox="0 0 24 24" fill={D.accent}>
@@ -567,8 +584,8 @@ export default function DashboardPage() {
         {!loading && (
           <div style={{ margin: '0 20px 32px' }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: D.text, letterSpacing: '-0.3px', display: 'block', marginBottom: 14 }}>Thống Kê Du Lịch</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ background: '#fff', borderRadius: 16, padding: '18px 18px 16px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1.5px solid rgba(0,0,0,0.05)' }}>
+            <div className="mobile-stat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="mobile-stat-card" style={{ background: '#fff', borderRadius: 16, padding: '18px 18px 16px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1.5px solid rgba(0,0,0,0.05)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: D.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>Quốc Gia</div>
                 <div style={{ fontSize: 36, fontWeight: 900, color: D.text, letterSpacing: '-2px', lineHeight: 1 }}>{countries || totalTrips}</div>
               </div>
@@ -583,7 +600,7 @@ export default function DashboardPage() {
         )}
 
         {/* FAB */}
-        <Link href="/trips/create" style={{
+        <Link href="/trips/create" className="mobile-fab" style={{
           position: 'fixed', bottom: 88, right: 20, zIndex: 50,
           width: 52, height: 52, borderRadius: '50%',
           background: 'linear-gradient(135deg, #2563eb, #7c3aed)',

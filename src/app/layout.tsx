@@ -12,6 +12,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'TripAI – AI Travel Planner',
   description: 'Lập kế hoạch du lịch thông minh với AI',
+  metadataBase: new URL('https://tripai.app'),
+  openGraph: {
+    title: 'TripAI – AI Travel Planner',
+    description: 'Lập kế hoạch du lịch thông minh với AI',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
