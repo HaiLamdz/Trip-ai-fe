@@ -209,7 +209,7 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
   if (!isEdit) {
     return (
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+        style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
         onClick={onClose}
       >
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)' }} />
@@ -299,7 +299,7 @@ export default function ActivityEditModal({ tripId, dayId, placeId, initial, onS
 
   // ─── Chế độ chỉnh sửa: form đầy đủ (giữ nguyên cho power user) ───
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)' }} />
       <div style={{ position: 'relative', width: '100%', maxWidth: 520, background: D.surface, border: `1px solid ${D.border2}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}
