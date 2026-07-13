@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 
-/* ─── Google Places Autocomplete ──────────────────────────────────────── */
-interface GooglePlaceResult {
-  description: string;
-  place_id: string;
+/* ─── Nominatim (OpenStreetMap) Autocomplete ─────────────────────────── */
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
 }
 
 function PlaceAutocomplete({
@@ -22,7 +24,7 @@ function PlaceAutocomplete({
   placeholder?: string;
   hasError?: boolean;
 }) {
-  const [suggestions, setSuggestions] = useState<GooglePlaceResult[]>([]);
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,16 +36,18 @@ function PlaceAutocomplete({
     debounce.current = setTimeout(async () => {
       setLoading(true);
       try {
+        // Nominatim OpenStreetMap geocoding — miễn phí, không cần API key
         const res = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(v)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=vi`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(v)}&format=json&limit=5&accept-language=vi`,
+          { headers: { 'User-Agent': 'TripAI-App/1.0' } },
         );
-        const data = await res.json();
-        setSuggestions(data.predictions || []);
-        setShow(data.predictions && data.predictions.length > 0);
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+        setShow(data.length > 0);
       } catch { /* ignore */ } finally {
         setLoading(false);
       }
-    }, 300);
+    }, 400);
   };
 
   return (
@@ -81,7 +85,14 @@ function PlaceAutocomplete({
           {suggestions.map((s, i) => (
             <button
               key={s.place_id} type="button"
-              onMouseDown={e => { e.preventDefault(); onSelect(s.description); setShow(false); setSuggestions([]); }}
+              onMouseDown={e => {
+                e.preventDefault();
+                // Lấy tên ngắn gọn từ display_name (phần đầu trước dấu phẩy đầu tiên)
+                const shortName = s.display_name.split(',')[0].trim();
+                onSelect(shortName);
+                setShow(false);
+                setSuggestions([]);
+              }}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '10px 14px', fontSize: 13, color: '#e6edf3',
@@ -89,7 +100,7 @@ function PlaceAutocomplete({
                 borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none',
               }}
             >
-              📍 {s.description}
+              📍 {s.display_name}
             </button>
           ))}
         </div>

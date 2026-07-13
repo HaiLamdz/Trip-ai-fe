@@ -86,7 +86,7 @@ export default function SavedPlacesPage() {
               {places.map(place => {
                 const typeKey = place.place_type || 'other';
                 const color = TYPE_COLORS[typeKey] || '#94a3b8';
-                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.place_name)}`;
+                const mapsUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(place.place_name)}`;
                 return (
                   <div key={place.id}
                     style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>

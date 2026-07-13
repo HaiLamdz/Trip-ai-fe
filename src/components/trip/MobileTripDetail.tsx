@@ -313,7 +313,8 @@ function PlanActivityRow({
   const { url: imgUrl, fallbackColor } = useUnsplashImage(activity.place_type, activity.title);
   const typeColor = TYPE_COLORS[activity.place_type] || '#94a3b8';
   const typeLabel = TYPE_LABELS[activity.place_type] || 'Khác';
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place_name)}`;
+  // OpenStreetMap — thay thế Google Maps
+  const mapsUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(activity.place_name)}`;
   const hasTickets = ['attraction', 'nightlife'].includes(activity.place_type);
 
   // Truncate description to ~50 chars
@@ -612,7 +613,8 @@ function JournalTab({ tripId }: { tripId: number }) {
       {entries.map((entry, idx) => {
         const typeColor = TYPE_COLORS[entry.place_type] || '#94a3b8';
         const typeLabel = TYPE_LABELS[entry.place_type] || 'Khác';
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entry.place_name)}`;
+        // OpenStreetMap — thay thế Google Maps
+        const mapsUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(entry.place_name)}`;
         return (
           <div key={entry.id} style={{ display: 'flex', gap: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 44, flexShrink: 0 }}>

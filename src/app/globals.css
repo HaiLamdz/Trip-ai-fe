@@ -2,79 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Base typography ──────────────────────────────────────────────────────── */
 @layer base {
+  :root {
+    color-scheme: light;
+    --page-bg: #f4f7ff;
+    --surface: rgba(255, 255, 255, 0.86);
+    --surface-strong: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-soft: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.12);
+    --accent: #2563eb;
+    --accent-2: #4f46e5;
+    --accent-soft: #e8f0ff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page-bg: #020617;
+      --surface: rgba(15, 23, 42, 0.78);
+      --surface-strong: #0f172a;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --border-soft: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --accent-soft: rgba(37, 99, 235, 0.2);
+    }
+  }
+
   html {
-    font-size: 15px; /* bump up from browser default 16px feels small at 14px tailwind default */
+    font-size: 15px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
+    @apply font-sans;
+    background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 32%), var(--page-bg);
+    color: var(--text-primary);
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
 
-  /* Headings — tighter tracking, heavier weight */
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
   }
 
-  /* Better input defaults */
   input, textarea, select, button {
     font-family: inherit;
     font-size: inherit;
   }
 }
 
-/* ── Component classes ────────────────────────────────────────────────────── */
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+    @apply inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(37,99,235,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700;
   }
+
   .btn-secondary {
-    @apply bg-teal-500 hover:bg-teal-600 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+    @apply inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800;
   }
+
   .btn-outline {
-    @apply border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+    @apply inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-50;
   }
+
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+    @apply rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur;
   }
+
   .input {
-    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full rounded-2xl border border-slate-200 bg-white/90 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
   }
+
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply mb-2 block text-sm font-medium text-slate-700;
+  }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-card {
+    @apply rounded-[28px] border border-slate-200/70 bg-white/80 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur;
   }
 }
 
-/* ── Utilities ────────────────────────────────────────────────────────────── */
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
 }
 
-/* ── CSS variables ────────────────────────────────────────────────────────── */
-:root {
-  --primary: #2563EB;
-  --secondary: #14B8A6;
-}
-
-/* ── Google Maps styles ────────────────────────────────────────────────────── */
-/* Google Maps container styling */
 .gm-style {
   font-family: var(--font-inter), Inter, system-ui, sans-serif;
   font-size: 14px;
 }
 
-/* Custom marker label styling */
 .custom-marker-label {
   color: #ffffff;
   font-size: 11px;
@@ -82,7 +113,6 @@
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
-/* ── Inline spinner for ActivityCard image loading ── */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

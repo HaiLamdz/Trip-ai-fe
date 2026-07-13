@@ -159,7 +159,7 @@ export default function JournalPage() {
             {entries.map((entry, idx) => {
               const typeColor = TYPE_COLORS[entry.place_type] || '#94a3b8';
               const typeLabel = TYPE_LABELS[entry.place_type] || 'Khác';
-              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entry.place_name)}`;
+              const mapsUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(entry.place_name)}`;
 
               return (
                 <div key={entry.id} style={{ display: 'flex', gap: 0 }}>

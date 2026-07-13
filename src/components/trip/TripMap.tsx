@@ -1,9 +1,18 @@
 'use client';
 
+/**
+ * TripMap — Leaflet + OpenStreetMap + OpenRouteService
+ *
+ * Thay thế hoàn toàn Google Maps. Sử dụng:
+ *  - Leaflet (bản đồ, marker, polyline)
+ *  - OpenStreetMap tiles (nền bản đồ)
+ *  - OpenRouteService Directions API (tuyến đường)
+ */
+
 import { useEffect, useRef } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
 import { PLACE_TYPE_COLORS } from '@/lib/utils';
 
+/* ─── Types ─────────────────────────────────────────────────── */
 interface Place {
   place_name: string;
   place_type: string;
@@ -18,7 +27,6 @@ interface Place {
   duration_minutes?: number;
   transport_to_next?: string | null;
   distance_to_next_km?: number;
-  // check-in
   checked_in_at?: string | null;
   checkin_photo_url?: string | null;
   checkin_note?: string | null;
@@ -37,6 +45,7 @@ interface Props {
   onMarkerClick?: (place: Place) => void;
 }
 
+/* ─── Màu cho từng ngày ──────────────────────────────────────── */
 const DAY_COLORS = [
   '#3b82f6', // blue
   '#10b981', // emerald
@@ -47,210 +56,271 @@ const DAY_COLORS = [
   '#06b6d4', // cyan
 ];
 
+/* ─── Tạo SVG marker icon dạng số ───────────────────────────── */
+function createNumberedIcon(num: number, color: string, L: typeof import('leaflet')) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
+      <path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 42 16 42 C16 42 32 28 32 16 C32 7.163 24.837 0 16 0 Z"
+        fill="${color}" stroke="#ffffff" stroke-width="2"/>
+      <text x="16" y="20" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#ffffff">
+        ${num}
+      </text>
+    </svg>
+  `;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [32, 42],
+    iconAnchor: [16, 42],
+    popupAnchor: [0, -42],
+  });
+}
+
+/* ─── Tạo marker ảnh check-in ────────────────────────────────── */
+function createCheckinIcon(photoUrl: string, L: typeof import('leaflet')) {
+  return L.divIcon({
+    html: `<div style="width:44px;height:44px;border-radius:50%;border:3px solid #10b981;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.4)">
+      <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" />
+    </div>`,
+    className: '',
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    popupAnchor: [0, -26],
+  });
+}
+
+/* ─── Gọi OpenRouteService lấy route geometry ────────────────── */
+async function fetchOrsRoute(
+  coords: [number, number][],     // [lng, lat][]  — ORS nhận lng trước
+  apiKey: string,
+): Promise<[number, number][]> { // trả về [lat, lng][] cho Leaflet
+  try {
+    const res = await fetch(
+      'https://api.openrouteservice.org/v2/directions/driving-car/geojson',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: apiKey,
+        },
+        body: JSON.stringify({ coordinates: coords }),
+      },
+    );
+    if (!res.ok) throw new Error(`ORS ${res.status}`);
+    const json = await res.json();
+    const geometry: [number, number][] = json.features?.[0]?.geometry?.coordinates ?? [];
+    // ORS trả [lng, lat] → đổi sang [lat, lng] cho Leaflet
+    return geometry.map(([lng, lat]) => [lat, lng]);
+  } catch {
+    // Nếu ORS lỗi, fallback vẽ đường thẳng
+    return coords.map(([lng, lat]) => [lat, lng]);
+  }
+}
+
+/* ─── Component chính ────────────────────────────────────────── */
 export default function TripMap({ places, days, activePlace, activeDayNumber, onMarkerClick }: Props) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
-  const polylinesRef = useRef<{ polyline: google.maps.Polyline; dayNumber: number }[]>([]);
+  const mapRef      = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapInstance = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersRef  = useRef<Map<string, any>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const polylinesRef = useRef<{ polyline: any; dayNumber: number }[]>([]);
+  const initializedRef = useRef(false);
 
+  /* ── Khởi tạo map một lần duy nhất ── */
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!mapRef.current || initializedRef.current) return;
+    initializedRef.current = true;
 
-    const loader = new Loader({
-      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-      version: 'weekly',
-      libraries: ['places'],
-    });
-
-    loader.load().then(() => {
-      const map = new google.maps.Map(mapRef.current!, {
-        center: { lat: 16.0544, lng: 108.2022 },
-        zoom: 12,
-        zoomControl: true,
-        zoomControlOptions: { position: google.maps.ControlPosition.BOTTOM_RIGHT },
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }],
-          },
-        ],
+    // Import Leaflet dynamic (chỉ chạy client-side)
+    import('leaflet').then(async (L) => {
+      // Fix icon path mặc định của Leaflet khi dùng webpack
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      mapInstanceRef.current = map;
+      // Inject Leaflet CSS nếu chưa có
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
 
-      const bounds = new google.maps.LatLngBounds();
+      /* Tạo map */
+      const map = L.map(mapRef.current!, {
+        center: [16.0544, 108.2022], // Mặc định: Đà Nẵng — sẽ fitBounds ngay sau
+        zoom: 12,
+        zoomControl: true,
+      });
 
-      days.forEach((day, dayIdx) => {
+      /* OpenStreetMap tile layer */
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
+
+      mapInstance.current = map;
+
+      const orsApiKey = process.env.NEXT_PUBLIC_OPENROUTESERVICE_API_KEY || '';
+      const bounds: [number, number][] = [];
+
+      /* Duyệt từng ngày để vẽ marker + route */
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+        const day = days[dayIdx];
         const color = DAY_COLORS[dayIdx % DAY_COLORS.length];
+
         const validPlaces = day.places
-          .filter(p => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude) && !isNaN(p.longitude))
+          .filter(p => p.latitude !== null && p.longitude !== null
+            && !isNaN(p.latitude!) && !isNaN(p.longitude!))
           .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-        const coords = validPlaces.map(p => ({ lat: Number(p.latitude), lng: Number(p.longitude) }));
-
-        // Draw polyline — hidden by default, shown only for active day
-        if (coords.length > 1) {
-          const polyline = new google.maps.Polyline({
-            path: coords,
-            strokeColor: color,
-            strokeOpacity: 0,
-            strokeWeight: 3,
-            map: map,
-          });
-          polylinesRef.current.push({ polyline, dayNumber: day.day_number });
-        }
-
-        // Numbered markers
+        /* Vẽ marker cho từng địa điểm */
         validPlaces.forEach((place, placeIdx) => {
           const lat = Number(place.latitude);
           const lng = Number(place.longitude);
-          bounds.extend({ lat, lng });
+          bounds.push([lat, lng]);
 
           const num = placeIdx + 1;
           const typeColor = PLACE_TYPE_COLORS[place.place_type] || color;
+          const icon = createNumberedIcon(num, typeColor, L);
 
-          // Create custom marker using SVG
-          const markerIcon = {
-            path: `M 0 0 C -10 -10 -10 -25 0 -35 C 10 -25 10 -10 0 0 Z`,
-            fillColor: typeColor,
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 1.2,
-            anchor: new google.maps.Point(0, 35),
-          };
+          const marker = L.marker([lat, lng], { icon }).addTo(map);
 
-          const marker = new google.maps.Marker({
-            position: { lat, lng },
-            map,
-            icon: markerIcon,
-            label: {
-              text: num.toString(),
-              color: '#ffffff',
-              fontSize: '11px',
-              fontWeight: '700',
-              className: 'custom-marker-label',
-            },
-          });
-
-          const infoWindow = new google.maps.InfoWindow({
-            content: `
-              <div style="min-width:200px;font-family:system-ui,sans-serif;padding:8px">
-                <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">${place.title}</div>
-                <div style="font-size:11px;color:#555;margin-bottom:6px;font-style:italic">${place.place_name}</div>
-                <div style="display:flex;gap:8px;font-size:11px;color:#555;margin-bottom:6px">
-                  <span>🕐 ${place.time}</span>
-                  ${place.estimated_cost > 0 ? `<span>💰 ${place.estimated_cost.toLocaleString('vi-VN')}đ</span>` : ''}
-                </div>
-                ${place.description ? `<div style="font-size:11px;color:#666;margin-bottom:8px;line-height:1.4">${place.description.slice(0, 100)}${place.description.length > 100 ? '…' : ''}</div>` : ''}
-                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.place_name)}" target="_blank" rel="noopener"
-                  style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#4285f4;text-decoration:none;background:#f0f4ff;padding:4px 10px;border-radius:6px;margin-top:4px">
-                  🗺 Mở Google Maps
-                </a>
+          /* Popup nội dung */
+          const osmUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(place.place_name)}`;
+          const popupHtml = `
+            <div style="min-width:200px;font-family:system-ui,sans-serif;padding:4px">
+              <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">${place.title}</div>
+              <div style="font-size:11px;color:#555;margin-bottom:6px;font-style:italic">${place.place_name}</div>
+              <div style="display:flex;gap:8px;font-size:11px;color:#555;margin-bottom:6px">
+                <span>🕐 ${place.time}</span>
+                ${place.estimated_cost > 0 ? `<span>💰 ${place.estimated_cost.toLocaleString('vi-VN')}đ</span>` : ''}
               </div>
-            `,
-            maxWidth: 240,
-          });
+              ${place.description ? `<div style="font-size:11px;color:#666;margin-bottom:8px;line-height:1.4">${place.description.slice(0, 100)}${place.description.length > 100 ? '…' : ''}</div>` : ''}
+              <a href="${osmUrl}" target="_blank" rel="noopener"
+                style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#0078a8;text-decoration:none;background:#e8f4f8;padding:4px 10px;border-radius:6px;margin-top:4px">
+                🗺 Xem trên OpenStreetMap
+              </a>
+            </div>
+          `;
+          marker.bindPopup(popupHtml, { maxWidth: 240 });
 
-          marker.addListener('click', () => {
-            infoWindow.open(map, marker);
+          marker.on('click', () => {
             if (onMarkerClick) onMarkerClick(place);
           });
 
-          const key = `${place.latitude},${place.longitude},${place.title}`;
+          const key = `${lat},${lng},${place.title}`;
           markersRef.current.set(key, marker);
 
-          // ── Check-in photo overlay marker ──
+          /* Marker ảnh check-in (nếu có) */
           if (place.checked_in_at && place.checkin_photo_url) {
-            const checkinMarker = new google.maps.Marker({
-              position: { lat, lng },
-              map,
-              icon: {
-                url: place.checkin_photo_url,
-                scaledSize: new google.maps.Size(48, 48),
-                anchor: new google.maps.Point(24, 48),
-              },
-              zIndex: 500,
-            });
-
-            const checkinNote = place.checkin_note ? `<div style="font-size:11px;color:#34d399;margin-top:6px;font-style:italic">"${place.checkin_note}"</div>` : '';
-
-            const checkinInfoWindow = new google.maps.InfoWindow({
-              content: `
-                <div style="min-width:200px;font-family:system-ui,sans-serif;padding:8px">
-                  <img src="${place.checkin_photo_url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" />
-                  <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">📍 ${place.title}</div>
-                  <div style="font-size:11px;color:#555">${place.place_name}</div>
-                  ${checkinNote}
-                </div>
-              `,
-              maxWidth: 220,
-            });
-
-            checkinMarker.addListener('click', () => {
-              checkinInfoWindow.open(map, checkinMarker);
-            });
+            const checkinIcon = createCheckinIcon(place.checkin_photo_url, L);
+            const checkinMarker = L.marker([lat, lng], { icon: checkinIcon, zIndexOffset: 500 }).addTo(map);
+            const noteHtml = place.checkin_note ? `<div style="font-size:11px;color:#34d399;margin-top:6px;font-style:italic">"${place.checkin_note}"</div>` : '';
+            checkinMarker.bindPopup(`
+              <div style="min-width:200px;font-family:system-ui,sans-serif;padding:4px">
+                <img src="${place.checkin_photo_url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block" />
+                <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:2px">📍 ${place.title}</div>
+                <div style="font-size:11px;color:#555">${place.place_name}</div>
+                ${noteHtml}
+              </div>
+            `, { maxWidth: 220 });
           }
         });
-      });
 
-      if (!bounds.isEmpty()) {
-        map.fitBounds(bounds, 40);
+        /* Vẽ tuyến đường bằng OpenRouteService */
+        if (validPlaces.length > 1) {
+          // ORS nhận tọa độ theo thứ tự [lng, lat]
+          const orsCoords: [number, number][] = validPlaces.map(p => [
+            Number(p.longitude),
+            Number(p.latitude),
+          ]);
+
+          // Gọi ORS và vẽ polyline (ẩn mặc định, chỉ hiện ngày active)
+          fetchOrsRoute(orsCoords, orsApiKey).then(routeLatLngs => {
+            const polyline = L.polyline(routeLatLngs, {
+              color,
+              weight: 4,
+              opacity: 0,  // ẩn mặc định
+              smoothFactor: 1,
+            }).addTo(map);
+
+            polylinesRef.current.push({ polyline, dayNumber: day.day_number });
+
+            // Hiện polyline của ngày đang active
+            const activeDay = activeDayNumber ?? days[0]?.day_number ?? 1;
+            if (day.day_number === activeDay) {
+              polyline.setStyle({ opacity: 0.85 });
+            }
+          });
+        }
       }
 
-      // Show first day's polyline by default
-      const initialDay = activeDayNumber ?? days[0]?.day_number ?? 1;
-      polylinesRef.current.forEach(({ polyline, dayNumber }) => {
-        polyline.setOptions({ strokeOpacity: dayNumber === initialDay ? 0.85 : 0 });
-      });
+      /* Fit bounds hiển thị tất cả địa điểm */
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
     });
 
+    /* Cleanup khi unmount */
     return () => {
-      if (mapInstanceRef.current) {
-        markersRef.current.forEach(marker => marker.setMap(null));
-        polylinesRef.current.forEach(({ polyline }) => polyline.setMap(null));
-        mapInstanceRef.current = null;
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
         markersRef.current.clear();
         polylinesRef.current = [];
+        initializedRef.current = false;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Highlight active place
+  /* ── Pan đến địa điểm đang active ── */
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (activePlace && activePlace.latitude !== null && activePlace.longitude !== null && !isNaN(activePlace.latitude) && !isNaN(activePlace.longitude)) {
-      mapInstanceRef.current.panTo({ lat: Number(activePlace.latitude), lng: Number(activePlace.longitude) });
-      mapInstanceRef.current.setZoom(15);
+    if (!mapInstance.current) return;
+    if (
+      activePlace &&
+      activePlace.latitude !== null && activePlace.longitude !== null &&
+      !isNaN(activePlace.latitude) && !isNaN(activePlace.longitude)
+    ) {
+      mapInstance.current.setView(
+        [Number(activePlace.latitude), Number(activePlace.longitude)],
+        15,
+        { animate: true },
+      );
+      // Mở popup của marker tương ứng
+      const key = `${activePlace.latitude},${activePlace.longitude},${activePlace.title}`;
+      const marker = markersRef.current.get(key);
+      if (marker) marker.openPopup();
     }
   }, [activePlace]);
 
-  // Show only active day's polyline, hide others
+  /* ── Hiện/ẩn polyline theo ngày active ── */
   useEffect(() => {
-    if (!mapInstanceRef.current || activeDayNumber == null) return;
+    if (!mapInstance.current || activeDayNumber == null) return;
     polylinesRef.current.forEach(({ polyline, dayNumber }) => {
-      polyline.setOptions({ strokeOpacity: dayNumber === activeDayNumber ? 0.85 : 0 });
+      polyline.setStyle({ opacity: dayNumber === activeDayNumber ? 0.85 : 0 });
     });
   }, [activeDayNumber]);
 
-  // Fit to active day
+  /* ── Fit bounds theo ngày active ── */
   useEffect(() => {
-    if (!mapInstanceRef.current || activeDayNumber == null) return;
+    if (!mapInstance.current || activeDayNumber == null) return;
     const day = days.find(d => d.day_number === activeDayNumber);
     if (!day) return;
     const coords = day.places
-      .filter(p => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude) && !isNaN(p.longitude))
-      .map(p => ({ lat: Number(p.latitude), lng: Number(p.longitude) }));
+      .filter(p => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude!) && !isNaN(p.longitude!))
+      .map(p => [Number(p.latitude), Number(p.longitude)] as [number, number]);
     if (coords.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      coords.forEach(coord => bounds.extend(coord));
-
-      mapInstanceRef.current?.fitBounds(bounds, 50);
+      mapInstance.current.fitBounds(coords, { padding: [50, 50] });
     }
   }, [activeDayNumber, days]);
 

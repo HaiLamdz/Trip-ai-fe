@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { PREFERENCES, formatCurrency } from '@/lib/utils';
 
-interface GooglePlaceResult {
-  description: string;
-  place_id: string;
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
 }
 
 const TRANSPORT_MODES = [
@@ -66,18 +66,18 @@ export default function CreateTripPage() {
   const [loading, setLoading] = useState(false);
 
   // Destination autocomplete state
-  const [suggestions, setSuggestions] = useState<GooglePlaceResult[]>([]);
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const destDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Origin autocomplete state
-  const [originSuggestions, setOriginSuggestions] = useState<GooglePlaceResult[]>([]);
+  const [originSuggestions, setOriginSuggestions] = useState<NominatimResult[]>([]);
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
   const originDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
 
-  // ── Destination autocomplete ──────────────────────
+  // ── Destination autocomplete — Nominatim (OpenStreetMap) ──────────────
   const handleDestinationChange = (value: string) => {
     setForm(f => ({ ...f, destination: value }));
     if (destDebounce.current) clearTimeout(destDebounce.current);
@@ -85,16 +85,17 @@ export default function CreateTripPage() {
     destDebounce.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(value)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=vi`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&accept-language=vi`,
+          { headers: { 'User-Agent': 'TripAI-App/1.0' } },
         );
-        const data = await res.json();
-        setSuggestions(data.predictions || []);
-        setShowSuggestions(true);
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+        setShowSuggestions(data.length > 0);
       } catch {}
-    }, 300);
+    }, 400);
   };
 
-  // ── Origin autocomplete ───────────────────────────
+  // ── Origin autocomplete — Nominatim (OpenStreetMap) ────────────────────
   const handleOriginChange = (value: string) => {
     setForm(f => ({ ...f, origin: value }));
     if (originDebounce.current) clearTimeout(originDebounce.current);
@@ -102,13 +103,14 @@ export default function CreateTripPage() {
     originDebounce.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(value)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&language=vi`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&accept-language=vi`,
+          { headers: { 'User-Agent': 'TripAI-App/1.0' } },
         );
-        const data = await res.json();
-        setOriginSuggestions(data.predictions || []);
-        setShowOriginSuggestions(true);
+        const data: NominatimResult[] = await res.json();
+        setOriginSuggestions(data);
+        setShowOriginSuggestions(data.length > 0);
       } catch {}
-    }, 300);
+    }, 400);
   };
 
   // ── Budget manual input ───────────────────────────
@@ -865,18 +867,22 @@ function AutocompleteDropdown({
   items,
   onSelect,
 }: {
-  items: GooglePlaceResult[];
+  items: NominatimResult[];
   onSelect: (name: string) => void;
 }) {
   return (
     <div style={{ position: 'absolute', zIndex: 20, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-      {items.map((s, i) => (
-        <button key={s.place_id} type="button"
-          onClick={() => onSelect(s.description)}
-          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#1e293b', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}>
-          📍 {s.description}
-        </button>
-      ))}
+      {items.map((s, i) => {
+        // Lấy tên ngắn gọn: phần trước dấu phẩy đầu tiên
+        const shortName = s.display_name.split(',')[0].trim();
+        return (
+          <button key={`${s.place_id}-${i}`} type="button"
+            onClick={() => onSelect(shortName)}
+            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#1e293b', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}>
+            📍 {s.display_name}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -65,7 +65,8 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
 
   const isCheckedIn = !!activity.checked_in_at;
   const typeColor = TYPE_COLORS[activity.place_type] || '#94a3b8';
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place_name)}`;
+  // OpenStreetMap — thay thế Google Maps
+  const mapsUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(activity.place_name)}`;
 
   const handleDelete = async () => {
     if (!activity.id) return;
@@ -135,7 +136,7 @@ export default function ActivityCard({ activity, isLast, isActive, tripId, dayId
               href={mapsUrl}
               target="_blank" rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
-              title={`Tìm "${activity.place_name}" trên Google Maps`}
+              title={`Tìm "${activity.place_name}" trên OpenStreetMap`}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 fontSize: 12, fontWeight: 600,
