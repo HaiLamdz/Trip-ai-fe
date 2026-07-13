@@ -137,7 +137,7 @@ export default function CheckinModal({ tripId, place, onSaved, onClose }: Props)
   /* ── UI ── */
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}
     >
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

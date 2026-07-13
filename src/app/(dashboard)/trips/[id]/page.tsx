@@ -745,7 +745,7 @@ export default function TripDetailPage() {
         </div>
 
         {/* RIGHT — 45% map */}
-        <div style={{ width: '45%', position: 'relative', overflow: 'hidden', isolation: 'isolate' }}>
+        <div style={{ width: '45%', position: 'relative', overflow: 'hidden', isolation: 'isolate', zIndex: 0 }}>
           {/* Day legend */}
           <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 1000, background: 'rgba(13,17,23,0.92)', backdropFilter: 'blur(8px)', border: `1px solid ${D.border2}`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: D.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Lộ trình</div>
@@ -768,7 +768,7 @@ export default function TripDetailPage() {
 
       {/* ── AI Chat Popup ── */}
       {chatOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: '0 24px 24px', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: '0 24px 24px', pointerEvents: 'none' }}>
           {/* Backdrop — click to close */}
           <div onClick={() => setChatOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', pointerEvents: 'all' }} />
 
@@ -853,7 +853,7 @@ export default function TripDetailPage() {
 
       {/* ── Publish Modal ── */}
       {publishOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setPublishOpen(false)}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
           <div
